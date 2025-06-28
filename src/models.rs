@@ -1058,11 +1058,7 @@ impl From<Macro> for Fm3ExtendMacro {
                     }
                 })
                 .collect::<Vec<ExtendPartSymbol>>();
-
             if value.len() > 3 {
-                panic!("Fm3extend: too many part symbols");
-            }
-
             return Self {
                 code: m.code,
                 value,
@@ -1174,7 +1170,6 @@ impl From<Macro> for VolumeDownMacro {
                 }
             }
 
-            println!("{:?}", tokens);
 
             let mut values = vec![];
             {
