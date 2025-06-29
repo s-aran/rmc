@@ -3,6 +3,7 @@ mod errors;
 mod meta_models;
 mod models;
 mod pass1;
+mod pass2;
 mod utils;
 
 use std::{
