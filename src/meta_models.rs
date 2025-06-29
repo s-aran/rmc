@@ -1,6 +1,8 @@
-use crate::{
-    models::{FmToneDefine, Macro, Variable},
-    utils::is_sep,
+use std::collections::{HashMap, HashSet};
+
+use crate::models::{
+    Comment1, Comment2, ExtendNormalOption, ExtendPartSymbol, FmToneDefine, Macro, OnOffOption,
+    PartSymbol, ReverseNormalOption, Variable,
 };
 
 pub type FileName = String;
@@ -10,7 +12,7 @@ pub type CharacterNumber = usize;
 pub type CommandName = String;
 pub type CommandParameter = String;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug, Default)]
 pub struct Code {
     pub file_name: FileName,
     pub lines: LineNumber,
@@ -18,12 +20,12 @@ pub struct Code {
 }
 
 impl Code {
-    pub fn next_line(&mut self) {
+    pub fn inc_lines(&mut self) {
         self.lines += 1;
         self.chars = 0;
     }
 
-    pub fn next_char(&mut self) {
+    pub fn inc_chars(&mut self) {
         self.chars += 1;
     }
 }
@@ -360,31 +362,6 @@ impl Default for Command {
     }
 }
 
-#[derive(Debug)]
-pub struct Flags {
-    opl_flag: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, strum::EnumString)]
-pub enum OnOffOption {
-    #[strum(serialize = "on")]
-    On,
-    #[strum(serialize = "off")]
-    Off,
-}
-
-#[derive(Debug, Clone)]
-pub enum ReverseNormalOption {
-    Reverse,
-    Normal,
-}
-
-#[derive(Debug, Clone)]
-pub enum ExtendNormalOption {
-    Extend,
-    Normal,
-}
-
 #[derive(Debug, Clone)]
 pub enum VariantValue {
     Unsigned(u8),
@@ -401,4 +378,17 @@ pub struct Pass1Result {
     pub macros: Vec<Macro>,
     pub variables: Vec<Variable>,
     pub fm_tones: Vec<FmToneDefine>,
+    pub comment1s: Vec<Comment1>,
+    pub comment2s: Vec<Comment2>,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct Pass2Result {
+    pub macros: Vec<Macro>,
+    pub variables: Vec<Variable>,
+    pub fm_tones: Vec<FmToneDefine>,
+    pub comment1s: Vec<Comment1>,
+    pub comment2s: Vec<Comment2>,
+
+    pub parts: HashMap<PartSymbol, Vec<String>>,
 }

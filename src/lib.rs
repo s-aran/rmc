@@ -2,7 +2,7 @@ mod consts;
 mod errors;
 mod meta_models;
 mod models;
-mod parse;
+mod pass1;
 mod utils;
 
 use std::{
@@ -10,7 +10,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{meta_models::Code, parse::Pass1};
+use crate::{meta_models::Code, pass1::Pass1};
 
 pub fn load_from_file(path: PathBuf) -> String {
     let file = fs::read(path).expect("Unable to read file");
@@ -26,7 +26,7 @@ pub fn load_from_file(path: PathBuf) -> String {
 pub fn load(mml: impl Into<String>) -> String {
     let code = Code::default();
     let mut pass1 = Pass1::new(code, mml.into());
-    let _ = pass1.pass1();
+    let _ = pass1.parse();
 
     return "".to_string();
 }
