@@ -1400,6 +1400,12 @@ impl From<Macro> for TransposeMacro {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Part {
+    code: Code,
+    commands: Vec,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

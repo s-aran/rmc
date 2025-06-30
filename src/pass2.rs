@@ -2,7 +2,7 @@ use crate::{
     errors::Pass1Error,
     meta_models::{Code, Command, Pass1Result, Pass2Result, Token, TokenStack, VariantValue},
     models::{Comment1, Comment2, FmToneDefine, Macro, Variable},
-    utils::{ParseUtil, is_n, is_sep, split},
+    utils::{is_n, is_sep, split, ParseUtil},
 };
 
 pub struct Pass2 {
@@ -21,7 +21,48 @@ impl ParseUtil for Pass2 {
     }
 
     fn parse_command(&self, c: char) -> Command {
-        todo!();
+        if is_sep(c) || is_n(c) {
+            return Command::Nop;
+        }
+
+        match c {
+            ';' => {
+                return Command::Comment1(self.get_code().clone());
+            }
+            '`' => {
+                return Command::Comment2(self.get_code().clone());
+            }
+            '@' => {
+                if self.get_code().chars == 0 {
+                    return Command::FmToneDefine(self.get_code().clone());
+                }
+            }
+            '#' => {
+                if self.get_code().chars == 0 {
+                    return Command::Macro(self.get_code().clone());
+                }
+            }
+            '!' => {
+                if self.get_code().chars == 0 {
+                    return Command::Variable(self.get_code().clone());
+                }
+            }
+            'A'..'Z' => {
+                if self.get_code().chars == 0 {
+                    //
+                }
+            }
+            'a'..'z' => {
+                if self.get_code().chars == 0 {
+                    //
+                }
+            }
+            _ => {
+                eprintln!("unsupported command: {}", c);
+            }
+        }
+
+        return Command::Nop;
     }
 }
 

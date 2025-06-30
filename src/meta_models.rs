@@ -390,5 +390,5 @@ pub struct Pass2Result {
     pub comment1s: Vec<Comment1>,
     pub comment2s: Vec<Comment2>,
 
-    pub parts: HashMap<PartSymbol, Vec<String>>,
+    pub parts: Vec<(PartSymbol, Vec<String>)>,
 }
