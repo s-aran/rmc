@@ -30,6 +30,13 @@ impl Code {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct MetaData<T> 
+{
+    code: Code ,
+    data: T,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Token {
     pub begin: usize,
