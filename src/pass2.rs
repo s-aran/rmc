@@ -1,8 +1,7 @@
+use std::str::FromStr;
+
 use crate::{
-    errors::Pass1Error,
-    meta_models::{Code, Command, Pass1Result, Pass2Result, Token, TokenStack, VariantValue},
-    models::{Comment1, Comment2, FmToneDefine, Macro, Variable},
-    utils::{is_n, is_sep, split, ParseUtil},
+    errors::{Pass1Error, Pass2Error}, meta_models::{Code, Command, Pass1Result, Pass2Result, Token, TokenStack, VariantValue}, models::{Comment1, Comment2, FmToneDefine, Macro, PartSymbol, Variable}, part_command::PartCommand, utils::{is_n, is_sep, split, ParseUtil}
 };
 
 pub struct Pass2 {
@@ -27,34 +26,34 @@ impl ParseUtil for Pass2 {
 
         match c {
             ';' => {
-                return Command::Comment1(self.get_code().clone());
+                return Command::Comment1(self.clone_code());
             }
             '`' => {
-                return Command::Comment2(self.get_code().clone());
+                return Command::Comment2(self.clone_code());
             }
             '@' => {
                 if self.get_code().chars == 0 {
-                    return Command::FmToneDefine(self.get_code().clone());
+                    return Command::FmToneDefine(self.clone_code());
                 }
             }
             '#' => {
                 if self.get_code().chars == 0 {
-                    return Command::Macro(self.get_code().clone());
+                    return Command::Macro(self.clone_code());
                 }
             }
             '!' => {
                 if self.get_code().chars == 0 {
-                    return Command::Variable(self.get_code().clone());
+                    return Command::Variable(self.clone_code());
                 }
             }
             'A'..'Z' => {
                 if self.get_code().chars == 0 {
-                    return Command::Part;
+                    return Command::Part(self.clone_code(), PartSymbol::from_str(&c.to_string().as_str()).unwrap());
                 }
             }
             'a'..'z' => {
                 if self.get_code().chars == 0 {
-                    return Command::Part;
+                    return Command::Part(self.clone_code(), PartSymbol::from_str(&c.to_string().as_str()).unwrap());
                 }
             }
             _ => {
@@ -75,12 +74,17 @@ impl Pass2 {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Pass2Result, Pass1Error> {
-        let mut result = Pass1Result::default();
+    fn clone_code(&self) ->Code{
+        self.get_code().clone()
+    }
+
+    pub fn parse(&mut self) -> Result<Pass2Result, Pass2Error> {
+        let mut result = Pass2Result::default();
 
         let mut tokens = TokenStack::new();
         let mut token = Token::new();
         let mut command = Command::Nop;
+        let mut part_command = PartCommand::Nop;
 
         for c in self.mml.chars() {
             match command {
@@ -93,6 +97,12 @@ impl Pass2 {
                 }
                 Command::Comment2(_) => 'comment2_command: {
                     break 'comment2_command;
+                }
+                Command::Part(_, ref part) => 'part_command:{
+                    if is_sep(c){
+                    break 'part_command;
+                    }
+                    break 'part_command;
                 }
                 _ => {
                     // nop
@@ -111,7 +121,7 @@ impl Pass2 {
 
 #[cfg(test)]
 mod tests {
-    use crate::pass1::Pass1;
+    use crate::{models::PartSymbol, pass1::Pass1};
 
     use super::*;
 
@@ -144,6 +154,8 @@ I	!c4!s[!h]3[!b[!h]3!s[!h]3]11 !sr!sr!sr !b!b!br !brr8 !br r1
         // moved
         let code = Code::default();
         let mut pass2 = Pass2::new(code, mml.to_owned(), pass1_result);
-        let result = pass2.parse();
+        let result: Pass2Result = pass2.parse().unwrap();
+
+        assert_eq!(7, result.get_parts(PartSymbol::G).len());
     }
 }

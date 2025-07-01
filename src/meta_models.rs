@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{self, HashMap, HashSet};
 
 use crate::models::{
     Comment1, Comment2, ExtendNormalOption, ExtendPartSymbol, FmToneDefine, Macro, OnOffOption,
@@ -360,7 +360,7 @@ pub enum Command {
     //     軽減されるようですのでお試し下さい。
     FmToneDefine(Code), // @
 
-    Part(Code),
+    Part(Code, PartSymbol),
 
     Unknown(CommandName, CommandParameter, Code),
 }
@@ -400,4 +400,11 @@ pub struct Pass2Result {
     pub comment2s: Vec<Comment2>,
 
     pub parts: Vec<(PartSymbol, Vec<String>)>,
+}
+
+impl Pass2Result{
+    pub fn get_parts(&self, part: PartSymbol) -> Vec<&String>
+    {
+        self.parts.iter().filter(|(s, _)| s==&part).flat_map(|(_, l)| l).collect()
+    }
 }

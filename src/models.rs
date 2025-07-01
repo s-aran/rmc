@@ -3,8 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use strum::VariantNames;
 
 use crate::{
-    meta_models::{Code, FileName, MetaData, Pass1Result, Token, TokenStack, VariantValue},
-    utils::is_sep,
+    meta_models::{Code, FileName, MetaData, Pass1Result, Token, TokenStack, VariantValue}, part_command::WrappedPartCommand, utils::is_sep
 };
 
 pub type MeasureType = u16;
@@ -90,6 +89,13 @@ pub enum NegativePositive {
     Negative,
     #[strum(serialize = "+")]
     Positive,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, strum::EnumString)]
+pub enum DivisorClock {
+    Divisor,
+    #[strum(serialize = "%")]
+    Clock
 }
 
 impl From<&str> for RelativeAbsolute8 {
@@ -1420,86 +1426,11 @@ pub enum NoteCommand {
     b,
     o,
     x,
-    #[strum(serialize = "<")]
-    OctaveUp,
     #[strum(serialize = ">")]
+    OctaveUp,
+    #[strum(serialize = "<")]
     OctaveDown,
 }
-
-#[derive(Debug, Clone, strum::EnumString)]
-pub enum PartCommand {
-    #[strum(serialize = "c")]
-    NoteC {
-        natural: Option<()>,
-        semitone: Option<NegativePositive>,
-        length: Option<u8>,
-        dots: Option<String>,
-    },
-    #[strum(serialize = "d")]
-    NoteD {
-        natural: Option<()>,
-        semitone: Option<NegativePositive>,
-        length: Option<u8>,
-        dots: Option<String>,
-    },
-    #[strum(serialize = "e")]
-    NoteE {
-        natural: Option<()>,
-        semitone: Option<NegativePositive>,
-        length: Option<u8>,
-        dots: Option<String>,
-    },
-    #[strum(serialize = "f")]
-    NoteF {
-        natural: Option<()>,
-        semitone: Option<NegativePositive>,
-        length: Option<u8>,
-        dots: Option<String>,
-    },
-    #[strum(serialize = "g")]
-    NoteG {
-        natural: Option<()>,
-        semitone: Option<NegativePositive>,
-        length: Option<u8>,
-        dots: Option<String>,
-    },
-    #[strum(serialize = "a")]
-    NoteA {
-        natural: Option<()>,
-        semitone: Option<NegativePositive>,
-        length: Option<u8>,
-        dots: Option<String>,
-    },
-    #[strum(serialize = "b")]
-    NoteB {
-        natural: Option<()>,
-        semitone: Option<NegativePositive>,
-        length: Option<u8>,
-        dots: Option<String>,
-    },
-    #[strum(serialize = "x")]
-    NoteX {
-        length: Option<u8>,
-        dots: Option<String>,
-    },
-    #[strum(serialize = "r")]
-    NoteR {
-        length: Option<u8>,
-        dots: Option<String>,
-    },
-    #[strum(serialize = "[")]
-    PoltamentBegin {
-        pitch1: Option<NoteCommand>,
-        pitch2: Option<NoteCommand>,
-        length1: Option<u8>,
-        dots: Option<String>,
-        length2: Option<u8>,
-    },
-    #[strum(serialize = "]")]
-    PoltamentEnd,
-}
-
-type WrappedPartCommand = MetaData<PartCommand>;
 
 #[derive(Debug, Clone)]
 pub struct Part {

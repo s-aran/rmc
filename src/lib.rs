@@ -5,6 +5,7 @@ mod models;
 mod pass1;
 mod pass2;
 mod utils;
+mod part_command;
 
 use std::{
     fs::{self},
