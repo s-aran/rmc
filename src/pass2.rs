@@ -49,12 +49,12 @@ impl ParseUtil for Pass2 {
             }
             'A'..'Z' => {
                 if self.get_code().chars == 0 {
-                    //
+                    return Command::Part;
                 }
             }
             'a'..'z' => {
                 if self.get_code().chars == 0 {
-                    //
+                    return Command::Part;
                 }
             }
             _ => {
@@ -76,7 +76,36 @@ impl Pass2 {
     }
 
     pub fn parse(&mut self) -> Result<Pass2Result, Pass1Error> {
-        todo!();
+        let mut result = Pass1Result::default();
+
+        let mut tokens = TokenStack::new();
+        let mut token = Token::new();
+        let mut command = Command::Nop;
+
+        for c in self.mml.chars() {
+            match command {
+                Command::Nop => 'nop: {
+                    command = self.parse_command(c);
+                    break 'nop;
+                }
+                Command::Comment1(_) => 'comment1_command: {
+                    break 'comment1_command;
+                }
+                Command::Comment2(_) => 'comment2_command: {
+                    break 'comment2_command;
+                }
+                _ => {
+                    // nop
+                }
+            }
+
+            self.code.inc_chars();
+            if is_n(c) {
+                self.code.inc_lines();
+            }
+        }
+
+        Ok(result)
     }
 }
 

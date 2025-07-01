@@ -31,9 +31,8 @@ impl Code {
 }
 
 #[derive(Debug, Clone)]
-pub struct MetaData<T> 
-{
-    code: Code ,
+pub struct MetaData<T> {
+    code: Code,
     data: T,
 }
 
@@ -360,6 +359,9 @@ pub enum Command {
     //     おとなしい場所を選ぶようにすれば、リピートする瞬間のノイズが
     //     軽減されるようですのでお試し下さい。
     FmToneDefine(Code), // @
+
+    Part(Code),
+
     Unknown(CommandName, CommandParameter, Code),
 }
 
