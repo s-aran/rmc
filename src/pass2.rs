@@ -84,10 +84,6 @@ impl Pass2 {
         }
     }
 
-    fn clone_code(&self) -> Code {
-        self.get_code().clone()
-    }
-
     pub fn parse(&mut self) -> Result<Pass2Result, Pass2Error> {
         let mut result = Pass2Result::default();
 
@@ -95,9 +91,13 @@ impl Pass2 {
         let mut token = Token::new();
         let mut command = Command::Nop;
         let mut part_command = PartCommand::Nop;
-        let mut commands = vec![];
+        let mut commands: Vec<PartCommand> = vec![];
 
-        for c in self.mml.chars() {
+        let mut chars = self.mml.chars();
+        let mut maybe_c = chars.next();
+        while maybe_c.is_some() {
+            let c = maybe_c.unwrap();
+
             match command {
                 Command::Nop => 'nop: {
                     command = self.parse_command(c);
@@ -132,6 +132,8 @@ impl Pass2 {
             if is_n(c) {
                 self.code.inc_lines();
             }
+
+            maybe_c = chars.next();
         }
 
         Ok(result)

@@ -23,6 +23,11 @@ pub trait ParseUtil {
 
     fn get_code(&self) -> &Code;
 
+    fn clone_code(&self) -> Code {
+        self.get_code().clone()
+    }
+
+
     fn current_line(&self) -> String {
         let mml = self.get_mml();
         let lines = mml.lines().collect::<Vec<&str>>();
