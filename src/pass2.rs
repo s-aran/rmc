@@ -1,7 +1,11 @@
 use std::str::FromStr;
 
 use crate::{
-    errors::{Pass1Error, Pass2Error}, meta_models::{Code, Command, Pass1Result, Pass2Result, Token, TokenStack, VariantValue}, models::{Comment1, Comment2, FmToneDefine, Macro, PartSymbol, Variable}, part_command::PartCommand, utils::{is_n, is_sep, split, ParseUtil}
+    errors::{Pass1Error, Pass2Error},
+    meta_models::{Code, Command, Pass1Result, Pass2Result, Token, TokenStack, VariantValue},
+    models::{Comment1, Comment2, FmToneDefine, Macro, PartSymbol, Variable},
+    part_command::PartCommand,
+    utils::{is_n, is_sep, split, ParseUtil},
 };
 
 pub struct Pass2 {
@@ -48,12 +52,18 @@ impl ParseUtil for Pass2 {
             }
             'A'..'Z' => {
                 if self.get_code().chars == 0 {
-                    return Command::Part(self.clone_code(), PartSymbol::from_str(&c.to_string().as_str()).unwrap());
+                    return Command::Part(
+                        self.clone_code(),
+                        PartSymbol::from_str(&c.to_string().as_str()).unwrap(),
+                    );
                 }
             }
             'a'..'z' => {
                 if self.get_code().chars == 0 {
-                    return Command::Part(self.clone_code(), PartSymbol::from_str(&c.to_string().as_str()).unwrap());
+                    return Command::Part(
+                        self.clone_code(),
+                        PartSymbol::from_str(&c.to_string().as_str()).unwrap(),
+                    );
                 }
             }
             _ => {
@@ -74,7 +84,7 @@ impl Pass2 {
         }
     }
 
-    fn clone_code(&self) ->Code{
+    fn clone_code(&self) -> Code {
         self.get_code().clone()
     }
 
@@ -85,6 +95,7 @@ impl Pass2 {
         let mut token = Token::new();
         let mut command = Command::Nop;
         let mut part_command = PartCommand::Nop;
+        let mut commands = vec![];
 
         for c in self.mml.chars() {
             match command {
@@ -98,10 +109,18 @@ impl Pass2 {
                 Command::Comment2(_) => 'comment2_command: {
                     break 'comment2_command;
                 }
-                Command::Part(_, ref part) => 'part_command:{
-                    if is_sep(c){
-                    break 'part_command;
+                Command::Part(_, ref part) => 'part_command: {
+                    if is_sep(c) {
+                        break 'part_command;
                     }
+
+                    if !is_n(c) {
+                        token.eat(c);
+                    }
+
+                    tokens.push(&token);
+                    token.clear();
+
                     break 'part_command;
                 }
                 _ => {
