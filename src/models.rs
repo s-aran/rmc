@@ -3,7 +3,9 @@ use std::{collections::HashMap, str::FromStr};
 use strum::VariantNames;
 
 use crate::{
-    meta_models::{Code, FileName, MetaData, Pass1Result, Token, TokenStack, VariantValue}, part_command::WrappedPartCommand, utils::is_sep
+    meta_models::{Code, FileName, MetaData, Pass1Result, Token, TokenStack, VariantValue},
+    part_command::WrappedPartCommand,
+    utils::is_sep,
 };
 
 pub type MeasureType = u16;
@@ -95,7 +97,7 @@ pub enum NegativePositive {
 pub enum DivisorClock {
     Divisor,
     #[strum(serialize = "%")]
-    Clock
+    Clock,
 }
 
 impl From<&str> for RelativeAbsolute8 {

@@ -1,5 +1,7 @@
-use crate::{meta_models::MetaData, models::{DivisorClock, NegativePositive, NoteCommand}};
-
+use crate::{
+    meta_models::MetaData,
+    models::{DivisorClock, NegativePositive, NoteCommand},
+};
 
 #[derive(Debug, Clone, strum::EnumString)]
 pub enum PartCommand {
@@ -74,51 +76,63 @@ pub enum PartCommand {
     #[strum(serialize = "]")]
     PortamentoEnd,
     #[strum(serialize = "o")]
-    Octave{
+    Octave {
         value: u8,
     },
     #[strum(serialize = ">")]
     OctaveUp,
-    #[strum(serialize = "<" )]
+    #[strum(serialize = "<")]
     OctaveDown,
     #[strum(serialize = "X")]
     OctaveReverse,
-    #[strum(serialize="o+")]
+    #[strum(serialize = "o+")]
     PartOctaveChangePositive,
-    #[strum(serialize="o-")]
+    #[strum(serialize = "o-")]
     PartOctaveChangeNegative,
     #[strum(serialize = "l")]
-    DefaultLength{
+    DefaultLength {
         value_type: Option<DivisorClock>,
         value: u8,
         dots: Option<String>,
     },
-    #[strum(serialize="l=")]
-    ProcessLastLengthUpdate{
+    #[strum(serialize = "l=")]
+    ProcessLastLengthUpdate {
         value_type: Option<DivisorClock>,
         value: Option<u8>,
         dots: Option<String>,
     },
-    #[strum(serialize="l+")]
-    ProcessLastLengthAdd{
+    #[strum(serialize = "l+")]
+    ProcessLastLengthAdd {
         value_type: Option<DivisorClock>,
         value: u8,
         dots: Option<String>,
     },
-    #[strum(serialize="l-")]
-    ProcessLastLengthSubtract{
+    #[strum(serialize = "l-")]
+    ProcessLastLengthSubtract {
         value_type: Option<DivisorClock>,
         value: u8,
         dots: Option<String>,
     },
-    #[strum(serialize="l^")]
-    ProcessLastLengthMultiply{
+    #[strum(serialize = "l^")]
+    ProcessLastLengthMultiply {
         value: u8,
     },
-    #[strum(serialize="&")]
-    Tie{length: Option<u8>, dots:Option<String>,},
-    #[strum(serialize="&&")]
-    Slur{length: Option<u8>, dots:Option<String>,},
+    #[strum(serialize = "&")]
+    Tie {
+        length: Option<u8>,
+        dots: Option<String>,
+    },
+    #[strum(serialize = "&&")]
+    Slur {
+        length: Option<u8>,
+        dots: Option<String>,
+    },
 }
 
 pub type WrappedPartCommand = MetaData<PartCommand>;
+
+// impl WrappedPartCommand {
+//     pub fn new(code: &Code, command: PartCommand) -> Self {
+//         MetaData::<PartCommand>::new(code, command)
+//     }
+// }

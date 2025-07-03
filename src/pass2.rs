@@ -4,7 +4,7 @@ use crate::{
     errors::{Pass1Error, Pass2Error},
     meta_models::{Code, Command, Pass1Result, Pass2Result, Token, TokenStack, VariantValue},
     models::{Comment1, Comment2, FmToneDefine, Macro, PartSymbol, Variable},
-    part_command::PartCommand,
+    part_command::{PartCommand, WrappedPartCommand},
     utils::{is_n, is_sep, split, ParseUtil},
 };
 
@@ -90,8 +90,8 @@ impl Pass2 {
         let mut tokens = TokenStack::new();
         let mut token = Token::new();
         let mut command = Command::Nop;
-        let mut part_command = PartCommand::Nop;
-        let mut commands: Vec<PartCommand> = vec![];
+        let mut part_command: Option<char> = None;
+        let mut commands: Vec<WrappedPartCommand> = vec![];
 
         let mut chars = self.mml.chars();
         let mut maybe_c = chars.next();
@@ -115,11 +115,24 @@ impl Pass2 {
                     }
 
                     if !is_n(c) {
-                        token.eat(c);
+                        match c {
+                            'c' | 'd' | 'e' | 'f' | 'g' | 'a' | 'b' => {
+                                token.eat(c);
+                                tokens.push(&token);
+                            }
+                            _ => {
+                                part_command = None;
+                            }
+                        };
+
+                        break 'part_command;
                     }
 
-                    tokens.push(&token);
-                    token.clear();
+                    println!("{:?}", part);
+
+                    let w = WrappedPartCommand::new(self.get_code(), part_command.clone());
+                    commands.push(w);
+                    result.parts.push((part.clone(), commands.clone()));
 
                     break 'part_command;
                 }
@@ -129,11 +142,10 @@ impl Pass2 {
             }
 
             self.code.inc_chars();
+            maybe_c = chars.next();
             if is_n(c) {
                 self.code.inc_lines();
             }
-
-            maybe_c = chars.next();
         }
 
         Ok(result)

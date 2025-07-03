@@ -4,6 +4,7 @@ use crate::models::{
     Comment1, Comment2, ExtendNormalOption, ExtendPartSymbol, FmToneDefine, Macro, OnOffOption,
     PartSymbol, ReverseNormalOption, Variable,
 };
+use crate::part_command::WrappedPartCommand;
 
 pub type FileName = String;
 pub type LineNumber = usize;
@@ -34,6 +35,15 @@ impl Code {
 pub struct MetaData<T> {
     code: Code,
     data: T,
+}
+
+impl<T> MetaData<T> {
+    pub fn new(code: &Code, data: T) -> Self {
+        Self {
+            code: code.clone(),
+            data,
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -399,12 +409,15 @@ pub struct Pass2Result {
     pub comment1s: Vec<Comment1>,
     pub comment2s: Vec<Comment2>,
 
-    pub parts: Vec<(PartSymbol, Vec<String>)>,
+    pub parts: Vec<(PartSymbol, Vec<WrappedPartCommand>)>,
 }
 
-impl Pass2Result{
-    pub fn get_parts(&self, part: PartSymbol) -> Vec<&String>
-    {
-        self.parts.iter().filter(|(s, _)| s==&part).flat_map(|(_, l)| l).collect()
+impl Pass2Result {
+    pub fn get_parts(&self, part: PartSymbol) -> Vec<&WrappedPartCommand> {
+        self.parts
+            .iter()
+            .filter(|(s, _)| s == &part)
+            .flat_map(|(_, l)| l)
+            .collect()
     }
 }
