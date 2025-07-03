@@ -128,6 +128,10 @@ impl TokenStack {
     pub fn clear(&mut self) {
         self.stack.clear();
     }
+
+    pub fn first(&self) -> Option<&Token> {
+        self.stack.first()
+    }
 }
 
 #[derive(Debug)]

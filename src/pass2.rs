@@ -5,7 +5,7 @@ use crate::{
     meta_models::{Code, Command, Pass1Result, Pass2Result, Token, TokenStack, VariantValue},
     models::{Comment1, Comment2, FmToneDefine, Macro, PartSymbol, Variable},
     part_command::{PartCommand, WrappedPartCommand},
-    utils::{is_n, is_sep, split, ParseUtil},
+    utils::{ParseUtil, is_n, is_sep, split},
 };
 
 pub struct Pass2 {
@@ -90,7 +90,6 @@ impl Pass2 {
         let mut tokens = TokenStack::new();
         let mut token = Token::new();
         let mut command = Command::Nop;
-        let mut part_command: Option<char> = None;
         let mut commands: Vec<WrappedPartCommand> = vec![];
 
         let mut chars = self.mml.chars();
@@ -104,37 +103,49 @@ impl Pass2 {
                     break 'nop;
                 }
                 Command::Comment1(_) => 'comment1_command: {
-                    break 'comment1_command;
-                }
-                Command::Comment2(_) => 'comment2_command: {
-                    break 'comment2_command;
-                }
-                Command::Part(_, ref part) => 'part_command: {
-                    if is_sep(c) {
-                        break 'part_command;
+                    if !is_n(c) {
+                        break 'comment1_command;
                     }
 
+                    command = Command::Nop;
+                }
+                Command::Comment2(_) => 'comment2_command: {
+                    if c != '`' {
+                        break 'comment2_command;
+                    }
+
+                    command = Command::Nop;
+                }
+                Command::Part(_, ref part) => 'part_command: {
                     if !is_n(c) {
                         match c {
                             'c' | 'd' | 'e' | 'f' | 'g' | 'a' | 'b' => {
+                                if !token.is_empty() {
+                                    // eval part command
+                                    let w = WrappedPartCommand::new(self.get_code(), part_command.clone());
+                                    commands.push(w);
+                                    result.parts.push((part.clone(), commands.clone()));
+                                    command = Command::Nop;
+                                }
                                 token.eat(c);
                                 tokens.push(&token);
+                                token.clear();
                             }
                             _ => {
-                                part_command = None;
+                                //
                             }
                         };
 
                         break 'part_command;
                     }
 
-                    println!("{:?}", part);
+                    // println!("{:?}: {:?}", part, tokens);
 
-                    let w = WrappedPartCommand::new(self.get_code(), part_command.clone());
-                    commands.push(w);
+                    // let w = WrappedPartCommand::new(self.get_code(), part_command.clone());
+                    // commands.push(w);
                     result.parts.push((part.clone(), commands.clone()));
 
-                    break 'part_command;
+                    command = Command::Nop; 
                 }
                 _ => {
                     // nop
