@@ -132,6 +132,14 @@ impl TokenStack {
     pub fn first(&self) -> Option<&Token> {
         self.stack.first()
     }
+
+    pub fn dequeue(&mut self) -> Option<Token> {
+        if self.stack.len() > 0 {
+            return Some(self.stack.remove(0));
+        }
+
+        None
+    }
 }
 
 #[derive(Debug)]

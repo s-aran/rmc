@@ -5,7 +5,7 @@ use crate::{
     meta_models::{Code, Command, Pass1Result, Pass2Result, Token, TokenStack, VariantValue},
     models::{Comment1, Comment2, FmToneDefine, Macro, PartSymbol, Variable},
     part_command::{PartCommand, WrappedPartCommand},
-    utils::{ParseUtil, is_n, is_sep, split},
+    utils::{is_n, is_sep, split, ParseUtil},
 };
 
 pub struct Pass2 {
@@ -122,11 +122,28 @@ impl Pass2 {
                             'c' | 'd' | 'e' | 'f' | 'g' | 'a' | 'b' => {
                                 if !token.is_empty() {
                                     // eval part command
-                                    let w = WrappedPartCommand::new(self.get_code(), part_command.clone());
-                                    commands.push(w);
-                                    result.parts.push((part.clone(), commands.clone()));
-                                    command = Command::Nop;
-                                }
+                                    // let w = WrappedPartCommand::new(
+                                    //     self.get_code(),
+                                    //     part_command.clone(),
+                                    // );
+                                    // commands.push(w);
+                                    // result.parts.push((part.clone(), commands.clone()));
+                                    if let Ok(t) = Pass2::make_part_command(&mut tokens) {
+                                        tokens.push(&t);
+                                    } else {
+                                        match Pass2::make_part_command(&mut tokens) {
+                                            Ok(cmd) => {
+                                                tokens.clear();
+                                                token.clear();
+                                                command = Command::Nop;
+                                            }
+                                            Err(e) => {
+                                                panic!("{}", e);
+                                            }
+                                        }
+                                    }
+                                } // if !is_empty()
+
                                 token.eat(c);
                                 tokens.push(&token);
                                 token.clear();
@@ -143,9 +160,12 @@ impl Pass2 {
 
                     // let w = WrappedPartCommand::new(self.get_code(), part_command.clone());
                     // commands.push(w);
+                    Pass2::make_part_command(&mut tokens);
+                    tokens.clear();
+                    token.clear();
                     result.parts.push((part.clone(), commands.clone()));
 
-                    command = Command::Nop; 
+                    command = Command::Nop;
                 }
                 _ => {
                     // nop
@@ -160,6 +180,40 @@ impl Pass2 {
         }
 
         Ok(result)
+    }
+
+    fn make_token(self, tokens: &mut TokenStack) -> Result<Token, Pass2Error> {
+        let mut maybe_t = tokens.dequeue();
+
+        while maybe_t.is_some() {
+            let t = maybe_t.unwrap();
+            match t {
+                _ => {
+                    println!("{:?}", t);
+                }
+            }
+
+            maybe_t = tokens.dequeue();
+        }
+
+        Ok(PartCommand::Nop)
+    }
+
+    fn make_part_command(tokens: &mut TokenStack) -> Result<PartCommand, Pass2Error> {
+        let mut maybe_t = tokens.dequeue();
+
+        while maybe_t.is_some() {
+            let t = maybe_t.unwrap();
+            match t {
+                _ => {
+                    println!("{:?}", t);
+                }
+            }
+
+            maybe_t = tokens.dequeue();
+        }
+
+        Ok(PartCommand::Nop)
     }
 }
 

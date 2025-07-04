@@ -3,16 +3,20 @@ use crate::{
     models::{DivisorClock, NegativePositive, NoteCommand},
 };
 
+#[derive(Debug, Clone)]
+pub struct Note {
+    command: char,
+    natural: Option<()>,
+    semitone: Option<NegativePositive>,
+    length: Option<u8>,
+    dots: Option<String>,
+}
+
 #[derive(Debug, Clone, strum::EnumString)]
 pub enum PartCommand {
     Nop,
     #[strum(serialize = "c")]
-    NoteC {
-        natural: Option<()>,
-        semitone: Option<NegativePositive>,
-        length: Option<u8>,
-        dots: Option<String>,
-    },
+    NoteC(Code, Note),
     #[strum(serialize = "d")]
     NoteD {
         natural: Option<()>,
