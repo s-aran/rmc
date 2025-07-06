@@ -1,13 +1,14 @@
 use std::str::FromStr;
 
 use crate::{
-    errors::{Pass1Error, Pass2Error},
-    meta_models::{Code, Command, Pass1Result, Pass2Result, Token, TokenStack, VariantValue},
-    models::{Comment1, Comment2, FmToneDefine, Macro, PartSymbol, Variable},
-    part_command::{PartCommand, WrappedPartCommand},
-    utils::{is_n, is_sep, split, ParseUtil},
+    errors::Pass2Error,
+    meta_models::{Code, Command, Pass1Result, Pass2Result, Pass2Working, Token, TokenStack},
+    models::PartSymbol,
+    part_command::{ParseState, PartCommand, StateMachine, WrappedPartCommand, is_command},
+    utils::{ParseUtil, is_n, is_sep},
 };
 
+#[derive(Debug, Clone)]
 pub struct Pass2 {
     code: Code,
     mml: String,
@@ -67,7 +68,7 @@ impl ParseUtil for Pass2 {
                 }
             }
             _ => {
-                eprintln!("unsupported command: {}", c);
+                // eprintln!("unsupported command: {}", c);
             }
         }
 
@@ -87,8 +88,8 @@ impl Pass2 {
     pub fn parse(&mut self) -> Result<Pass2Result, Pass2Error> {
         let mut result = Pass2Result::default();
 
-        let mut tokens = TokenStack::new();
-        let mut token = Token::new();
+        let mut working = Pass2Working::default();
+
         let mut command = Command::Nop;
         let mut commands: Vec<WrappedPartCommand> = vec![];
 
@@ -117,55 +118,28 @@ impl Pass2 {
                     command = Command::Nop;
                 }
                 Command::Part(_, ref part) => 'part_command: {
-                    if !is_n(c) {
-                        match c {
-                            'c' | 'd' | 'e' | 'f' | 'g' | 'a' | 'b' => {
-                                if !token.is_empty() {
-                                    // eval part command
-                                    // let w = WrappedPartCommand::new(
-                                    //     self.get_code(),
-                                    //     part_command.clone(),
-                                    // );
-                                    // commands.push(w);
-                                    // result.parts.push((part.clone(), commands.clone()));
-                                    if let Ok(t) = Pass2::make_part_command(&mut tokens) {
-                                        tokens.push(&t);
-                                    } else {
-                                        match Pass2::make_part_command(&mut tokens) {
-                                            Ok(cmd) => {
-                                                tokens.clear();
-                                                token.clear();
-                                                command = Command::Nop;
-                                            }
-                                            Err(e) => {
-                                                panic!("{}", e);
-                                            }
-                                        }
-                                    }
-                                } // if !is_empty()
-
-                                token.eat(c);
-                                tokens.push(&token);
-                                token.clear();
-                            }
-                            _ => {
-                                //
-                            }
-                        };
-
-                        break 'part_command;
-                    }
-
-                    // println!("{:?}: {:?}", part, tokens);
+                    // println!("{:?}: {:?}", part, working.tokens);
 
                     // let w = WrappedPartCommand::new(self.get_code(), part_command.clone());
                     // commands.push(w);
-                    Pass2::make_part_command(&mut tokens);
-                    tokens.clear();
-                    token.clear();
-                    result.parts.push((part.clone(), commands.clone()));
+                    let res = self.parse_part_command(&mut working, c);
+                    if let Ok(r) = res {
+                        match r {
+                            PartCommand::Nop => {
+                                break 'part_command;
+                            }
+                            _ => {
+                                working.clear();
+                                commands.push(WrappedPartCommand::new(self.get_code(), r));
+                                if is_n(c) {
+                                    result.parts.push((part.clone(), commands.clone()));
+                                    commands.clear();
+                                }
 
-                    command = Command::Nop;
+                                command = Command::Nop;
+                            }
+                        };
+                    }
                 }
                 _ => {
                     // nop
@@ -179,38 +153,282 @@ impl Pass2 {
             }
         }
 
+        if !working.token.is_empty() {
+            working.push();
+            println!("end: {:?}", working.tokens);
+        }
+
         Ok(result)
     }
 
-    fn make_token(self, tokens: &mut TokenStack) -> Result<Token, Pass2Error> {
-        let mut maybe_t = tokens.dequeue();
+    fn parse_part_command(
+        &self,
+        working: &mut Pass2Working,
+        c: char,
+    ) -> Result<PartCommand, Pass2Error> {
+        println!(
+            "begin: {c}: {:?} {:?} / {}",
+            working.token,
+            working.tokens,
+            working.tokens.first().is_some()
+        );
 
-        while maybe_t.is_some() {
-            let t = maybe_t.unwrap();
-            match t {
-                _ => {
-                    println!("{:?}", t);
-                }
+        working.inc();
+
+        if working.tokens.first().is_none() {
+            if working.token.is_empty() && is_sep(c) {
+                return Ok(PartCommand::Nop);
             }
 
-            maybe_t = tokens.dequeue();
+            if working.token.is_empty() {
+                working.eat(c);
+            }
+
+            let t = working.token.chars.as_str();
+            match t {
+                "c" | "d" | "e" | "f" | "g" | "a" | "b" => {
+                    working.push();
+                    return Ok(PartCommand::Nop);
+                }
+                "_" => {
+                    if working.index != 2 {
+                        return Ok(PartCommand::Nop);
+                    }
+
+                    match c {
+                        '_' | '{' | 'M' => {
+                            working.eat(c);
+                            working.push();
+                            return Ok(PartCommand::Nop);
+                        }
+                        _ => {
+                            working.push();
+                            // fall
+                        }
+                    }
+                }
+                "}" => {
+                    working.push();
+                    return Ok(PartCommand::Nop);
+                }
+                "[" => {
+                    working.loop_nest += 1;
+                    working.push();
+                    return Ok(PartCommand::Nop);
+                }
+                "]" => {
+                    working.loop_nest -= 1;
+                    working.push();
+                    return Ok(PartCommand::Nop);
+                }
+                ":" => {
+                    // special char in loop
+                    if working.loop_nest > 0 {
+                        working.eat(c);
+                        working.push();
+                        // TODO: define pseudo command
+                        return Ok(PartCommand::Nop);
+                    }
+                }
+                _ => {
+                    panic!("unknwon command: {c}");
+                }
+            }
         }
 
-        Ok(PartCommand::Nop)
-    }
+        match working.tokens.first().unwrap().chars.as_str() {
+            "c" | "d" | "e" | "f" | "g" | "a" | "b" => {
+                match c {
+                    '=' => {
+                        // natural, optional
+                        if working.state > 0 {
+                            panic!("Note: unexpected {c}");
+                        }
+                        working.eat(c);
+                        working.push();
+                        working.jump(1);
+                    }
+                    '+' | '-' => {
+                        // semitone, optional
+                        if working.state > 1 {
+                            panic!("Note: unexptected {c}");
+                        }
+                        working.eat(c);
+                        working.push();
+                        working.jump(2);
+                    }
+                    '0'..'9' => {
+                        // length, optional
+                        if working.state > 3 {
+                            panic!("Note: unexpected {c}");
+                        }
 
-    fn make_part_command(tokens: &mut TokenStack) -> Result<PartCommand, Pass2Error> {
-        let mut maybe_t = tokens.dequeue();
+                        working.eat(c);
+                        working.jump(3);
+                    }
+                    '.' => {
+                        // dots, optional
+                        if working.state > 4 {
+                            panic!("Note: unexpected {c}");
+                        }
 
-        while maybe_t.is_some() {
-            let t = maybe_t.unwrap();
-            match t {
-                _ => {
-                    println!("{:?}", t);
+                        if working.state == 3 {
+                            working.push();
+                        }
+
+                        working.eat(c);
+                        working.jump(4);
+                    }
+                    _ => {
+                        // other command
+                        working.push();
+                        println!("end: {:?}", working.tokens);
+                        working.clear();
+
+                        // retry
+                        return self.parse_part_command(working, c);
+                    }
+                };
+            }
+            "_" | "__" => {
+                match c {
+                    '+' | '-' => {
+                        // semitone, required
+                        if working.state != 0 {
+                            panic!("Absolute Transpose: unexpected {c}");
+                        }
+
+                        working.eat(c);
+                        working.push();
+                        working.jump(1);
+                    }
+                    '0'..'9' => {
+                        // value
+                        if working.state > 1 {
+                            panic!("Absolute Transpose: unexpected {c}");
+                        }
+
+                        working.eat(c);
+                        working.jump(2);
+                    }
+                    _ => {
+                        // other command
+                        working.push();
+                        println!("end: {:?}", working.tokens);
+                        working.clear();
+
+                        // retry
+                        return self.parse_part_command(working, c);
+                    }
                 }
             }
+            "_{" => {
+                match c {
+                    '+' | '-' | '=' => {
+                        // semitone|natural, required
+                        if working.state > 0 {
+                            panic!("Ranged Transpose: unexpected {c}");
+                        }
 
-            maybe_t = tokens.dequeue();
+                        working.eat(c);
+                        working.push();
+                        working.jump(1);
+                    }
+                    'c' | 'd' | 'e' | 'f' | 'g' | 'a' | 'b' => {
+                        if !(working.state == 1 || working.state == 2) {
+                            panic!("Ranged Transpose: unexpected {c}");
+                        }
+
+                        working.eat(c);
+                        working.push();
+                        working.jump(2);
+                    }
+                    _ => {
+                        // other command
+                        working.push();
+                        println!("end: {:?}", working.tokens);
+                        working.clear();
+
+                        // retry
+                        return self.parse_part_command(working, c);
+                    }
+                }
+            }
+            "}" => {
+                working.push();
+                println!("end: {:?}", working.tokens);
+                working.clear();
+
+                // retry
+                return self.parse_part_command(working, c);
+            }
+            "_M" => {
+                match c {
+                    '+' | '-' => {
+                        // semitone, required
+                        if working.state != 0 {
+                            panic!("Master Transpose: unexpected {c}");
+                        }
+
+                        working.eat(c);
+                        working.push();
+                        working.jump(1);
+                    }
+                    '0'..'9' => {
+                        // value
+                        if !(working.state == 1 || working.state == 2) {
+                            panic!("Master Transpose: unexpected {c}");
+                        }
+
+                        working.eat(c);
+                        working.jump(2);
+                    }
+                    _ => {
+                        // other command
+                        working.push();
+                        println!("end: {:?}", working.tokens);
+                        working.clear();
+
+                        // retry
+                        return self.parse_part_command(working, c);
+                    }
+                }
+            }
+            "[" => {
+                // other command
+                working.push();
+                println!("end: {:?}", working.tokens);
+                working.clear();
+
+                // retry
+                return self.parse_part_command(working, c);
+            }
+            "]" => {
+                match c {
+                    '0'..'9' => {
+                        // loop count
+                        if working.state != 0 {
+                            panic!("Loop: unexpected {c}");
+                        }
+
+                        working.eat(c);
+                        working.push();
+                        working.jump(1);
+                    }
+                    _ => {
+                        // other command
+                        working.push();
+                        println!("end: {:?}", working.tokens);
+                        working.clear();
+
+                        // retry
+                        return self.parse_part_command(working, c);
+                    }
+                }
+            }
+            _ => {
+                //
+            }
         }
 
         Ok(PartCommand::Nop)
@@ -225,6 +443,21 @@ mod tests {
 
     #[test]
     fn test_1() {
+        let mml = r#"G	c+4d-12e8f.g=a..b4...._-2[e__+1]8_0_{-eab}_M+120"#;
+
+        let code = Code::default();
+        let mut pass1 = Pass1::new(code, mml.to_owned());
+        let pass1_result = pass1.parse().unwrap();
+
+        // moved
+        let code = Code::default();
+        let mut pass2 = Pass2::new(code, mml.to_owned(), pass1_result);
+        let result: Pass2Result = pass2.parse().unwrap();
+
+        assert_eq!(7, result.get_parts(PartSymbol::G).len());
+    }
+    #[test]
+    fn test_2() {
         let mml = r#";{{ 音階1 [音階2 …音階16まで] }} [音長] [ ,1音の長さ(def=%1) [ ,タイon(1,def)/off(0)
 ;				         [ ,gate(def=0) [ ,1loopで変化する音量±(def=0) ]]]]
 ;音量は変化させたら戻らない手抜き仕様です >_<

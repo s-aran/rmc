@@ -1,7 +1,7 @@
 use crate::meta_models::{Code, Command};
 
 const SEPARATORS: &[char] = &[' ', '\t', '\n', '\r'];
-const DELIMITER: char = '\n';
+const DELIMITERS: &[char] = &['\n', '\0'];
 
 pub fn split(target: &str) -> Vec<&str> {
     target
@@ -15,7 +15,7 @@ pub fn is_sep(c: char) -> bool {
 }
 
 pub fn is_n(c: char) -> bool {
-    c == DELIMITER
+    DELIMITERS.contains(&c)
 }
 
 pub trait ParseUtil {
@@ -26,7 +26,6 @@ pub trait ParseUtil {
     fn clone_code(&self) -> Code {
         self.get_code().clone()
     }
-
 
     fn current_line(&self) -> String {
         let mml = self.get_mml();

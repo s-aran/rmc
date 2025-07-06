@@ -4,7 +4,7 @@ use crate::models::{
     Comment1, Comment2, ExtendNormalOption, ExtendPartSymbol, FmToneDefine, Macro, OnOffOption,
     PartSymbol, ReverseNormalOption, Variable,
 };
-use crate::part_command::WrappedPartCommand;
+use crate::part_command::{State, WrappedPartCommand};
 
 pub type FileName = String;
 pub type LineNumber = usize;
@@ -101,7 +101,7 @@ impl Token {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Default)]
 pub struct TokenStack {
     stack: Vec<Token>,
 }
@@ -139,6 +139,10 @@ impl TokenStack {
         }
 
         None
+    }
+
+    pub fn get(&self, index: usize) -> Option<&Token> {
+        self.stack.get(index)
     }
 }
 
@@ -411,6 +415,45 @@ pub struct Pass1Result {
     pub fm_tones: Vec<FmToneDefine>,
     pub comment1s: Vec<Comment1>,
     pub comment2s: Vec<Comment2>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Pass2Working {
+    pub tokens: TokenStack,
+    pub token: Token,
+    pub state: State,
+    pub index: usize,
+    pub loop_nest: u8,
+}
+
+impl Pass2Working {
+    pub fn eat(&mut self, c: char) {
+        self.token.eat(c);
+    }
+
+    pub fn push(&mut self) {
+        self.tokens.push(&self.token);
+        self.token.clear();
+    }
+
+    pub fn clear(&mut self) {
+        self.tokens.clear();
+        self.token.clear();
+        self.state = 0;
+        self.index = 0;
+    }
+
+    pub fn inc(&mut self) {
+        self.index += 1;
+    }
+
+    pub fn next(&mut self) {
+        self.jump(self.state + 1);
+    }
+
+    pub fn jump(&mut self, state: State) {
+        self.state = state;
+    }
 }
 
 #[derive(Default, Debug, Clone)]
