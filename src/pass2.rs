@@ -5,7 +5,7 @@ use crate::{
     meta_models::{Code, Command, Pass1Result, Pass2Result, Pass2Working},
     models::PartSymbol,
     part_command::{PartCommand, WrappedPartCommand},
-    utils::{ParseUtil, is_n, is_sep},
+    utils::{is_n, is_sep, ParseUtil},
 };
 
 #[derive(Debug, Clone)]
@@ -283,6 +283,10 @@ impl Pass2 {
                         // other command
                         working.push();
                         println!("end: {:?}", working.tokens);
+                        let instance = Note::From();
+                        working
+                            .commands
+                            .push(PartCimmand::Note(working.command_code, instance));
                         working.clear();
 
                         // retry

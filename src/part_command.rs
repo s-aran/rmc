@@ -22,6 +22,18 @@ pub struct Note {
     pub dots: Option<String>,
 }
 
+impl From<TokenStack> for Note {
+    fn from(tokens: TokenStack) -> Self {
+        let mut index = 0;
+        let mut t = tokens.dequeue();
+        while t.is_some() {
+            let command = t.chars;
+            t = tokens.dequeue();
+            index += 1;
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct NoteX {
     pub length: Option<u8>,

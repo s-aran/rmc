@@ -424,6 +424,7 @@ pub(crate) struct Pass2Working {
     pub state: State,
     pub index: usize,
     pub loop_nest: u8,
+    pub commands: Vec<WrappedPartCommand>,
 }
 
 impl Pass2Working {
