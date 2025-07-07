@@ -1,16 +1,83 @@
 use crate::{
-    meta_models::{Code, MetaData},
+    meta_models::{Code, MetaData, Token, TokenStack, TokenStackTrait, TokenTrait},
     models::{DivisorClock, NegativePositive, NoteCommand},
 };
 
 pub(crate) type State = u8;
 
-#[derive(Debug)]
-pub(crate) enum MachineState {
-    Nop,
-    Command,
-    Parameter,
-    Completed(PartCommand),
+#[derive(Debug, Clone, Default)]
+pub(crate) struct PartToken {
+    state: State,
+    token: Token,
+}
+
+impl TokenTrait for PartToken {
+    fn chars(&self) -> &String {
+        self.token.chars()
+    }
+
+    fn chars_mut(&mut self) -> &mut String {
+        self.token.chars_mut()
+    }
+
+    fn begin(&self) -> &usize {
+        self.token.begin()
+    }
+
+    fn begin_mut(&mut self) -> &mut usize {
+        self.token.begin_mut()
+    }
+
+    fn end(&self) -> &usize {
+        self.token.end()
+    }
+
+    fn end_mut(&mut self) -> &mut usize {
+        self.token.end_mut()
+    }
+}
+
+impl PartToken {
+    pub fn set_state(&mut self, state: State) {
+        self.state = state;
+    }
+
+    pub fn get_state(&self) -> State {
+        self.state
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct PartTokenStack {
+    stack: Vec<PartToken>,
+}
+
+impl TokenStackTrait<PartToken> for PartTokenStack {
+    fn stack(&self) -> &Vec<PartToken> {
+        &self.stack
+    }
+
+    fn stack_mut(&mut self) -> &mut Vec<PartToken> {
+        &mut self.stack
+    }
+}
+
+impl PartTokenStack {
+    pub fn first(&self) -> Option<&PartToken> {
+        self.stack.first()
+    }
+
+    pub fn dequeue(&mut self) -> Option<PartToken> {
+        if self.stack.len() > 0 {
+            return Some(self.stack.remove(0));
+        }
+
+        None
+    }
+
+    pub fn get(&self, index: usize) -> Option<&PartToken> {
+        self.stack.get(index)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -20,18 +87,6 @@ pub struct Note {
     pub semitone: Option<NegativePositive>,
     pub length: Option<u8>,
     pub dots: Option<String>,
-}
-
-impl From<TokenStack> for Note {
-    fn from(tokens: TokenStack) -> Self {
-        let mut index = 0;
-        let mut t = tokens.dequeue();
-        while t.is_some() {
-            let command = t.chars;
-            t = tokens.dequeue();
-            index += 1;
-        }
-    }
 }
 
 #[derive(Debug, Clone)]

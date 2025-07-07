@@ -2,10 +2,10 @@ use std::str::FromStr;
 
 use crate::{
     errors::Pass2Error,
-    meta_models::{Code, Command, Pass1Result, Pass2Result, Pass2Working},
+    meta_models::{Code, Command, Pass1Result, Pass2Result, Pass2Working, TokenTrait},
     models::PartSymbol,
-    part_command::{PartCommand, WrappedPartCommand},
-    utils::{is_n, is_sep, ParseUtil},
+    part_command::{Note, PartCommand, WrappedPartCommand},
+    utils::{ParseUtil, is_n, is_sep},
 };
 
 #[derive(Debug, Clone)]
@@ -184,7 +184,7 @@ impl Pass2 {
                 working.eat(c);
             }
 
-            let t = working.token.chars.as_str();
+            let t = working.token.chars().as_str();
             match t {
                 "c" | "d" | "e" | "f" | "g" | "a" | "b" => {
                     working.push();
@@ -236,7 +236,7 @@ impl Pass2 {
             }
         }
 
-        match working.tokens.first().unwrap().chars.as_str() {
+        match working.tokens.first().unwrap().chars().as_str() {
             "c" | "d" | "e" | "f" | "g" | "a" | "b" => {
                 match c {
                     '=' => {
@@ -283,10 +283,10 @@ impl Pass2 {
                         // other command
                         working.push();
                         println!("end: {:?}", working.tokens);
-                        let instance = Note::From();
-                        working
-                            .commands
-                            .push(PartCimmand::Note(working.command_code, instance));
+                        // let instance = Note::From();
+                        // working
+                        //     .commands
+                        //     .push(PartCommand::Note(working.command_code, instance));
                         working.clear();
 
                         // retry
