@@ -46,7 +46,6 @@ impl PartToken {
         self.state
     }
 }
-
 #[derive(Debug, Clone, Default)]
 pub(crate) struct PartTokenStack {
     stack: Vec<PartToken>,
@@ -78,6 +77,33 @@ impl PartTokenStack {
     pub fn get(&self, index: usize) -> Option<&PartToken> {
         self.stack.get(index)
     }
+
+    pub fn find_by_state(&self, state: State) -> Vec<&PartToken> {
+        self.stack.iter().filter(|&e| e.state == state).collect()
+    }
+
+    pub fn get_by_state(&self, state: State) -> Option<&PartToken> {
+        let r = self.find_by_state(state);
+        if r.len() > 1 {
+            panic!("get_by_state({})", state);
+        }
+
+        match r.get(0) {
+            Some(e) => Some(*e),
+            None => None,
+        }
+    }
+
+    pub fn get_and_cast<T>(&self, state: State) ->Option<T> where T: From<String>
+    {
+        let t = self.get_by_state(state);
+        match t {
+            Some(e) => 
+                Some(T::from(e.chars)),
+            None => None
+
+       }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -87,6 +113,18 @@ pub struct Note {
     pub semitone: Option<NegativePositive>,
     pub length: Option<u8>,
     pub dots: Option<String>,
+}
+
+impl TryFrom<PartTokenStack> for Note {
+    fn try_from(tokens: PartTokenStack) -> Self {
+        let mut r = Note {
+            command: tokens.first().unwrap(),
+            natural: tokens.get_and_cast<NegativePositive>(1).unwrap(),
+            semitone: tokens.get_by_state(2),
+            length: tokens.get_by_state(3),
+            dots: tokens.get_by_state(4),
+        };
+    }
 }
 
 #[derive(Debug, Clone)]
