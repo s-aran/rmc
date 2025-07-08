@@ -122,6 +122,7 @@ impl Pass2 {
 
                     // let w = WrappedPartCommand::new(self.get_code(), part_command.clone());
                     // commands.push(w);
+                    working.code = self.code.clone();
                     let res = self.parse_part_command(&mut working, c);
                     if let Ok(r) = res {
                         match r {
@@ -173,8 +174,6 @@ impl Pass2 {
             working.tokens.first().is_some()
         );
 
-        working.inc();
-
         if working.tokens.first().is_none() {
             if working.token.is_empty() && is_sep(c) {
                 return Ok(PartCommand::Nop);
@@ -188,10 +187,12 @@ impl Pass2 {
             match t {
                 "c" | "d" | "e" | "f" | "g" | "a" | "b" => {
                     working.push();
+                    working.jump(1);
                     return Ok(PartCommand::Nop);
                 }
                 "_" => {
-                    if working.index != 2 {
+                    if working.state <= 0 {
+                        working.jump(1);
                         return Ok(PartCommand::Nop);
                     }
 
@@ -209,16 +210,19 @@ impl Pass2 {
                 }
                 "}" => {
                     working.push();
+                    working.jump(1);
                     return Ok(PartCommand::Nop);
                 }
                 "[" => {
                     working.loop_nest += 1;
                     working.push();
+                    working.jump(1);
                     return Ok(PartCommand::Nop);
                 }
                 "]" => {
                     working.loop_nest -= 1;
                     working.push();
+                    working.jump(1);
                     return Ok(PartCommand::Nop);
                 }
                 ":" => {
@@ -226,6 +230,7 @@ impl Pass2 {
                     if working.loop_nest > 0 {
                         working.eat(c);
                         working.push();
+                        working.jump(1);
                         // TODO: define pseudo command
                         return Ok(PartCommand::Nop);
                     }
@@ -241,25 +246,27 @@ impl Pass2 {
                 match c {
                     '=' => {
                         // natural, optional
-                        if working.state > 0 {
+                        if working.state > 1 {
                             panic!("Note: unexpected {c}");
                         }
+
                         working.eat(c);
-                        working.push();
                         working.jump(1);
+                        working.push();
                     }
                     '+' | '-' => {
                         // semitone, optional
-                        if working.state > 1 {
+                        if working.state > 2 {
                             panic!("Note: unexptected {c}");
                         }
+
                         working.eat(c);
-                        working.push();
                         working.jump(2);
+                        working.push();
                     }
                     '0'..'9' => {
                         // length, optional
-                        if working.state > 3 {
+                        if working.state > 4 {
                             panic!("Note: unexpected {c}");
                         }
 
@@ -268,7 +275,7 @@ impl Pass2 {
                     }
                     '.' => {
                         // dots, optional
-                        if working.state > 4 {
+                        if working.state > 5 {
                             panic!("Note: unexpected {c}");
                         }
 
@@ -282,7 +289,17 @@ impl Pass2 {
                     _ => {
                         // other command
                         working.push();
-                        println!("end: {:?}", working.tokens);
+                        let note = match Note::try_from(working.tokens.clone()) {
+                            Ok(v) => v,
+                            Err(e) => panic!("Note: {}", e),
+                        };
+                        let w = WrappedPartCommand::new(
+                            working.tokens.first().unwrap().get_code(),
+                            PartCommand::Note(note),
+                        );
+
+                        println!("end: {:?} // {:?}", working.tokens, w);
+                        working.commands.push(w);
                         // let instance = Note::From();
                         // working
                         //     .commands
@@ -298,22 +315,22 @@ impl Pass2 {
                 match c {
                     '+' | '-' => {
                         // semitone, required
-                        if working.state != 0 {
-                            panic!("Absolute Transpose: unexpected {c}");
-                        }
-
-                        working.eat(c);
-                        working.push();
-                        working.jump(1);
-                    }
-                    '0'..'9' => {
-                        // value
                         if working.state > 1 {
                             panic!("Absolute Transpose: unexpected {c}");
                         }
 
                         working.eat(c);
+                        working.push();
                         working.jump(2);
+                    }
+                    '0'..'9' => {
+                        // value
+                        if working.state > 3 {
+                            panic!("Absolute Transpose: unexpected {c}");
+                        }
+
+                        working.eat(c);
+                        working.jump(3);
                     }
                     _ => {
                         // other command
@@ -330,22 +347,22 @@ impl Pass2 {
                 match c {
                     '+' | '-' | '=' => {
                         // semitone|natural, required
-                        if working.state > 0 {
-                            panic!("Ranged Transpose: unexpected {c}");
-                        }
-
-                        working.eat(c);
-                        working.push();
-                        working.jump(1);
-                    }
-                    'c' | 'd' | 'e' | 'f' | 'g' | 'a' | 'b' => {
-                        if !(working.state == 1 || working.state == 2) {
+                        if working.state > 1 {
                             panic!("Ranged Transpose: unexpected {c}");
                         }
 
                         working.eat(c);
                         working.push();
                         working.jump(2);
+                    }
+                    'c' | 'd' | 'e' | 'f' | 'g' | 'a' | 'b' => {
+                        if working.state > 3 {
+                            panic!("Ranged Transpose: unexpected {c}");
+                        }
+
+                        working.eat(c);
+                        working.push();
+                        working.jump(3);
                     }
                     _ => {
                         // other command
@@ -370,22 +387,22 @@ impl Pass2 {
                 match c {
                     '+' | '-' => {
                         // semitone, required
-                        if working.state != 0 {
+                        if working.state > 1 {
                             panic!("Master Transpose: unexpected {c}");
                         }
 
                         working.eat(c);
                         working.push();
-                        working.jump(1);
+                        working.jump(2);
                     }
                     '0'..'9' => {
                         // value
-                        if !(working.state == 1 || working.state == 2) {
+                        if working.state > 3 {
                             panic!("Master Transpose: unexpected {c}");
                         }
 
                         working.eat(c);
-                        working.jump(2);
+                        working.jump(3);
                     }
                     _ => {
                         // other command
@@ -411,13 +428,13 @@ impl Pass2 {
                 match c {
                     '0'..'9' => {
                         // loop count
-                        if working.state != 0 {
+                        if working.state > 2 {
                             panic!("Loop: unexpected {c}");
                         }
 
                         working.eat(c);
                         working.push();
-                        working.jump(1);
+                        working.jump(2);
                     }
                     _ => {
                         // other command

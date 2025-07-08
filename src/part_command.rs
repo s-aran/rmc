@@ -1,4 +1,7 @@
+use std::str::FromStr;
+
 use crate::{
+    errors::Pass2Error,
     meta_models::{Code, MetaData, Token, TokenStack, TokenStackTrait, TokenTrait},
     models::{DivisorClock, NegativePositive, NoteCommand},
 };
@@ -8,6 +11,7 @@ pub(crate) type State = u8;
 #[derive(Debug, Clone, Default)]
 pub(crate) struct PartToken {
     state: State,
+    code: Code,
     token: Token,
 }
 
@@ -44,6 +48,14 @@ impl PartToken {
 
     pub fn get_state(&self) -> State {
         self.state
+    }
+
+    pub fn set_code(&mut self, code: &Code) {
+        self.code = code.clone();
+    }
+
+    pub fn get_code(&self) -> &Code {
+        &self.code
     }
 }
 #[derive(Debug, Clone, Default)]
@@ -94,15 +106,18 @@ impl PartTokenStack {
         }
     }
 
-    pub fn get_and_cast<T>(&self, state: State) ->Option<T> where T: From<String>
+    pub fn get_and_cast<T>(&self, state: State) -> Result<Option<T>, <T as FromStr>::Err>
+    where
+        T: FromStr + Clone,
     {
         let t = self.get_by_state(state);
         match t {
-            Some(e) => 
-                Some(T::from(e.chars)),
-            None => None
-
-       }
+            Some(e) => match T::from_str(e.token.chars.as_str()) {
+                Ok(v) => Ok(Some(v)),
+                Err(e) => Err(e),
+            },
+            None => Ok(None),
+        }
     }
 }
 
@@ -116,14 +131,53 @@ pub struct Note {
 }
 
 impl TryFrom<PartTokenStack> for Note {
-    fn try_from(tokens: PartTokenStack) -> Self {
-        let mut r = Note {
-            command: tokens.first().unwrap(),
-            natural: tokens.get_and_cast<NegativePositive>(1).unwrap(),
-            semitone: tokens.get_by_state(2),
-            length: tokens.get_by_state(3),
-            dots: tokens.get_by_state(4),
+    type Error = Pass2Error;
+
+    fn try_from(value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = match value.get_and_cast(0) {
+            Ok(v) => {
+                if let Some(w) = v {
+                    w
+                } else {
+                    panic!("TryFrom for Note (command): command is None");
+                }
+            }
+            Err(e) => panic!("TryFrom for Note (command): {}", e),
         };
+
+        let natural = match value.get_and_cast::<String>(1) {
+            Ok(v) => {
+                if let Some(w) = v {
+                    Some(w == "=")
+                } else {
+                    None
+                }
+            }
+            Err(e) => panic!("TryFrom for Note (natural): {}", e),
+        };
+
+        let semitone = match value.get_and_cast::<NegativePositive>(2) {
+            Ok(v) => v,
+            Err(e) => panic!("TryFrom for Note (semitone): {}", e),
+        };
+
+        let length = match value.get_and_cast::<u8>(3) {
+            Ok(v) => v,
+            Err(e) => panic!("TryFrom for Note (lengh): {}", e),
+        };
+
+        let dots = match value.get_and_cast::<String>(4) {
+            Ok(v) => v,
+            Err(e) => panic!("TryFrom for Note (dots): {}", e),
+        };
+
+        Ok(Note {
+            command,
+            natural,
+            semitone,
+            length,
+            dots,
+        })
     }
 }
 
@@ -217,34 +271,28 @@ pub struct Slur {
 pub enum PartCommand {
     Nop,
 
-    NoteC(Code, Note),
-    NoteD(Code, Note),
-    NoteE(Code, Note),
-    NoteF(Code, Note),
-    NoteG(Code, Note),
-    NoteA(Code, Note),
-    NoteB(Code, Note),
-    NoteX(Code, NoteX),
-    NoteR(Code, NoteR),
+    Note(Note),
+    NoteX(NoteX),
+    NoteR(NoteR),
 
-    Portamento(Code, PortamentoBegin),
+    Portamento(PortamentoBegin),
 
-    Octave(Code, Octave),
-    OctaveUp(Code),
-    OctaveDown(Code),
-    OctaveReverse(Code),
-    PartOctaveChangePositive(Code),
-    PartOctaveChangeNegative(Code),
+    Octave(Octave),
+    OctaveUp,
+    OctaveDown,
+    OctaveReverse,
+    PartOctaveChangePositive,
+    PartOctaveChangeNegative,
 
-    DefaultLength(Code, DefaultLength),
+    DefaultLength(DefaultLength),
 
-    ProcessLastLengthUpdate(Code, ProcessLastLengthUpdate),
-    ProcessLastLengthAdd(Code, ProcessLastLengthAdd),
-    ProcessLastLengthSubtract(Code, ProcessLastLengthSubtract),
-    ProcessLastLengthMultiply(Code, ProcessLastLengthMultiply),
+    ProcessLastLengthUpdate(ProcessLastLengthUpdate),
+    ProcessLastLengthAdd(ProcessLastLengthAdd),
+    ProcessLastLengthSubtract(ProcessLastLengthSubtract),
+    ProcessLastLengthMultiply(ProcessLastLengthMultiply),
 
-    Tie(Code, Tie),
-    Slur(Code, Slur),
+    Tie(Tie),
+    Slur(Slur),
 }
 
 pub type WrappedPartCommand = MetaData<PartCommand>;

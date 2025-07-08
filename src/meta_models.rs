@@ -451,8 +451,8 @@ pub struct Pass1Result {
 pub(crate) struct Pass2Working {
     pub tokens: PartTokenStack,
     pub token: PartToken,
+    pub code: Code,
     pub state: State,
-    pub index: usize,
     pub loop_nest: u8,
     pub commands: Vec<WrappedPartCommand>,
 }
@@ -463,6 +463,7 @@ impl Pass2Working {
     }
 
     pub fn push(&mut self) {
+        self.token.set_code(&self.code);
         self.token.set_state(self.state);
         self.tokens.push(&self.token);
         self.token.clear();
@@ -472,11 +473,6 @@ impl Pass2Working {
         self.tokens.clear();
         self.token.clear();
         self.state = 0;
-        self.index = 0;
-    }
-
-    pub fn inc(&mut self) {
-        self.index += 1;
     }
 
     pub fn next(&mut self) {
