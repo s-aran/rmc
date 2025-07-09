@@ -5,7 +5,7 @@ use crate::{
     meta_models::{Code, Command, Pass1Result, Pass2Result, Pass2Working, TokenTrait},
     models::PartSymbol,
     part_command::{Note, PartCommand, WrappedPartCommand},
-    utils::{is_n, is_sep, ParseUtil},
+    utils::{ParseUtil, is_n, is_sep},
 };
 
 #[derive(Debug, Clone)]
@@ -93,7 +93,8 @@ impl Pass2 {
         let mut command = Command::Nop;
         let mut commands: Vec<WrappedPartCommand> = vec![];
 
-        let mut chars = self.mml.chars();
+        let new_lined_mml = format!("{}\n", self.mml);
+        let mut chars = new_lined_mml.chars();
         let mut maybe_c = chars.next();
         while maybe_c.is_some() {
             let c = maybe_c.unwrap();
@@ -118,7 +119,7 @@ impl Pass2 {
                     command = Command::Nop;
                 }
                 Command::Part(_, ref part) => 'part_command: {
-                    // println!("{:?}: {:?}", part, working.tokens);
+                    println!("{c} ==> {:?}: {:?}", part, working.tokens);
 
                     // let w = WrappedPartCommand::new(self.get_code(), part_command.clone());
                     // commands.push(w);
@@ -135,7 +136,7 @@ impl Pass2 {
                         result.parts.push((part.clone(), working.commands.clone()));
 
                         println!("============================================================");
-                        println!("{:?}", working);
+                        println!("{:?}", result);
                     }
 
                     if let Ok(r) = res {
@@ -176,12 +177,12 @@ impl Pass2 {
         working: &mut Pass2Working,
         c: char,
     ) -> Result<PartCommand, Pass2Error> {
-        println!(
-            "begin: {c}: {:?} {:?} / {}",
-            working.token,
-            working.tokens,
-            working.tokens.first().is_some()
-        );
+        // println!(
+        //     "begin: {c}: {:?} {:?} / {}",
+        //     working.token,
+        //     working.tokens,
+        //     working.tokens.first().is_some()
+        // );
 
         if working.tokens.first().is_none() {
             if working.token.is_empty() && is_sep(c) {
@@ -484,7 +485,7 @@ mod tests {
         let mut pass2 = Pass2::new(code, mml.to_owned(), pass1_result);
         let result: Pass2Result = pass2.parse().unwrap();
 
-        assert_eq!(1, result.get_parts(PartSymbol::G).len());
+        assert_eq!(1, result.get_parts(&PartSymbol::G).len());
     }
 
     #[test]
@@ -518,6 +519,6 @@ I	!c4!s[!h]3[!b[!h]3!s[!h]3]11 !sr!sr!sr !b!b!br !brr8 !br r1
         let mut pass2 = Pass2::new(code, mml.to_owned(), pass1_result);
         let result: Pass2Result = pass2.parse().unwrap();
 
-        assert_eq!(7, result.get_parts(PartSymbol::G).len());
+        assert_eq!(7, result.get_parts(&PartSymbol::G).len());
     }
 }

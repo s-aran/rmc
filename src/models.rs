@@ -98,24 +98,11 @@ pub enum NegativePositive {
 
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumString)]
 pub enum DivisorClock {
+    #[strum(serialize = "")]
     Divisor,
     #[strum(serialize = "%")]
     Clock,
 }
-
-// impl From<Token> for DivisorClock {
-//     fn from(value: Token) -> Self {
-//         if value.is_empty() {
-//             return DivisorClock::Divisor;
-//         }
-//
-//         if let Ok(v) = DivisorClock::from_str(&value.chars) {
-//             v
-//         } else {
-//             panic!("DivisorClock::from()");
-//         }
-//     }
-// }
 
 impl From<&str> for RelativeAbsolute8 {
     fn from(value: &str) -> Self {

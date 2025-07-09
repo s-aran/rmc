@@ -496,11 +496,11 @@ pub struct Pass2Result {
 }
 
 impl Pass2Result {
-    pub fn get_parts(&self, part: PartSymbol) -> Vec<&WrappedPartCommand> {
+    pub fn get_parts(&self, part: &PartSymbol) -> Vec<&Vec<WrappedPartCommand>> {
         self.parts
             .iter()
-            .filter(|(s, _)| s == &part)
-            .flat_map(|(_, l)| l)
-            .collect()
+            .filter(|(s, _)| s == part)
+            .map(|(_, l)| l)
+            .collect::<Vec<&Vec<WrappedPartCommand>>>()
     }
 }
