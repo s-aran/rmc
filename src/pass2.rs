@@ -5,7 +5,7 @@ use crate::{
     meta_models::{Code, Command, Pass1Result, Pass2Result, Pass2Working, TokenTrait},
     models::PartSymbol,
     part_command::{Note, PartCommand, WrappedPartCommand},
-    utils::{ParseUtil, is_n, is_sep},
+    utils::{is_n, is_sep, ParseUtil},
 };
 
 #[derive(Debug, Clone)]
@@ -124,22 +124,36 @@ impl Pass2 {
                     // commands.push(w);
                     working.code = self.code.clone();
                     let res = self.parse_part_command(&mut working, c);
-                    if let Ok(r) = res {
-                        match r {
-                            PartCommand::Nop => {
-                                break 'part_command;
-                            }
-                            _ => {
-                                working.clear();
-                                commands.push(WrappedPartCommand::new(self.get_code(), r));
-                                if is_n(c) {
-                                    result.parts.push((part.clone(), commands.clone()));
-                                    commands.clear();
-                                }
+                    if is_n(c) {
+                        if !working.token.is_empty() {
+                            working.push();
+                            println!("end: {:?}", working.tokens);
+                        }
 
-                                command = Command::Nop;
-                            }
-                        };
+                        working.clear();
+
+                        result.parts.push((part.clone(), working.commands.clone()));
+
+                        println!("============================================================");
+                        println!("{:?}", working);
+                    }
+
+                    if let Ok(r) = res {
+                        // match r {
+                        //     PartCommand::Nop => {
+                        //         break 'part_command;
+                        //     }
+                        //     _ => {
+                        //         working.clear();
+                        //         commands.push(WrappedPartCommand::new(self.get_code(), r));
+                        //         if is_n(c) {
+                        //             result.parts.push((part.clone(), commands.clone()));
+                        //             commands.clear();
+                        //         }
+
+                        //         command = Command::Nop;
+                        //     }
+                        // };
                     }
                 }
                 _ => {
@@ -152,11 +166,6 @@ impl Pass2 {
             if is_n(c) {
                 self.code.inc_lines();
             }
-        }
-
-        if !working.token.is_empty() {
-            working.push();
-            println!("end: {:?}", working.tokens);
         }
 
         Ok(result)
@@ -475,8 +484,9 @@ mod tests {
         let mut pass2 = Pass2::new(code, mml.to_owned(), pass1_result);
         let result: Pass2Result = pass2.parse().unwrap();
 
-        assert_eq!(7, result.get_parts(PartSymbol::G).len());
+        assert_eq!(1, result.get_parts(PartSymbol::G).len());
     }
+
     #[test]
     fn test_2() {
         let mml = r#";{{ 音階1 [音階2 …音階16まで] }} [音長] [ ,1音の長さ(def=%1) [ ,タイon(1,def)/off(0)

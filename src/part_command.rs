@@ -121,7 +121,7 @@ impl PartTokenStack {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Note {
     pub command: String,
     pub natural: Option<bool>,
@@ -181,19 +181,19 @@ impl TryFrom<PartTokenStack> for Note {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NoteX {
     pub length: Option<u8>,
     pub dots: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NoteR {
     pub length: Option<u8>,
     pub dots: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PortamentoBegin {
     pub pitch1: Option<NoteCommand>,
     pub pitch2: Option<NoteCommand>,
@@ -202,72 +202,72 @@ pub struct PortamentoBegin {
     pub length2: Option<u8>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Octave {
     pub value: u8,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct OctaveUp;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct OctaveDown;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct OctaveReverse;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PartOctaveChangePositive;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PartOctaveChangeNegative;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DefaultLength {
     pub value_type: Option<DivisorClock>,
     pub value: u8,
     pub dots: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ProcessLastLengthUpdate {
     pub value_type: Option<DivisorClock>,
     pub value: Option<u8>,
     pub dots: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ProcessLastLengthAdd {
     pub value_type: Option<DivisorClock>,
     pub value: u8,
     pub dots: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ProcessLastLengthSubtract {
     pub value_type: Option<DivisorClock>,
     pub value: u8,
     pub dots: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ProcessLastLengthMultiply {
     pub value: u8,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Tie {
     pub length: Option<u8>,
     pub dots: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Slur {
     pub length: Option<u8>,
     pub dots: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PartCommand {
     Nop,
 

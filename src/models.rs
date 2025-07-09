@@ -1433,7 +1433,7 @@ impl From<Macro> for TransposeMacro {
     }
 }
 
-#[derive(Debug, Clone, strum::EnumString)]
+#[derive(Debug, Clone, Eq, PartialEq, strum::EnumString)]
 #[allow(non_camel_case_types)]
 pub enum NoteCommand {
     c,
