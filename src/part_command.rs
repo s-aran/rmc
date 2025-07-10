@@ -268,6 +268,58 @@ pub struct Slur {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+pub struct TemporaryTranspose {
+    pub command: String,
+    pub semitone: NegativePositive,
+    pub value: u8,
+}
+
+impl TryFrom<PartTokenStack> for TemporaryTranspose {
+    type Error = Pass2Error;
+
+    fn try_from(value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = match value.get_and_cast(0) {
+            Ok(v) => {
+                if let Some(w) = v {
+                    w
+                } else {
+                    panic!("TryFrom for TemporaryTranspose (command): command is None");
+                }
+            }
+            Err(e) => panic!("TryFrom for TemporaryTranspose (command): {}", e),
+        };
+
+        let semitone = match value.get_and_cast::<NegativePositive>(1) {
+            Ok(v) => {
+                if let Some(w) = v {
+                    w
+                } else {
+                    panic!("TryFrom for TemporaryTranspose (semitone) is None");
+                }
+            }
+            Err(e) => panic!("TryFrom for TemporaryTranspose (semitone): {}", e),
+        };
+
+        let value = match value.get_and_cast::<u8>(2) {
+            Ok(v) => {
+                if let Some(w) = v {
+                    w
+                } else {
+                    panic!("TryFrom for TemporaryTranspose (value) is None");
+                }
+            }
+            Err(e) => panic!("TryFrom for TemporaryTranspose (value): {}", e),
+        };
+
+        Ok(Self {
+            command,
+            semitone,
+            value,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PartCommand {
     Nop,
 
@@ -293,6 +345,9 @@ pub enum PartCommand {
 
     Tie(Tie),
     Slur(Slur),
+
+    AbsoluteTranspose(TemporaryTranspose),
+    RelativeTranspose(TemporaryTranspose),
 }
 
 pub type WrappedPartCommand = MetaData<PartCommand>;

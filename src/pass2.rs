@@ -5,7 +5,7 @@ use crate::{
     meta_models::{Code, Command, Pass1Result, Pass2Result, Pass2Working, TokenTrait},
     models::PartSymbol,
     part_command::{Note, PartCommand, WrappedPartCommand},
-    utils::{ParseUtil, is_n, is_sep},
+    utils::{is_n, is_sep, ParseUtil},
 };
 
 #[derive(Debug, Clone)]
@@ -485,7 +485,12 @@ mod tests {
         let mut pass2 = Pass2::new(code, mml.to_owned(), pass1_result);
         let result: Pass2Result = pass2.parse().unwrap();
 
-        assert_eq!(1, result.get_parts(&PartSymbol::G).len());
+        let part_g_list = result.get_parts(&PartSymbol::G);
+        assert_eq!(1, part_g_list.len());
+
+        let g_commands = part_g_list.get(0).unwrap();
+        assert_eq!(15, g_commands.len());
+        let g = part_g_list.get(0).unwrap().get(0).unwrap();
     }
 
     #[test]
