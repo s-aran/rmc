@@ -4,7 +4,7 @@ use crate::{
     errors::Pass2Error,
     meta_models::{Code, Command, Pass1Result, Pass2Result, Pass2Working, TokenTrait},
     models::PartSymbol,
-    part_command::{Note, PartCommand, WrappedPartCommand},
+    part_command::{Note, PartCommand, TemporaryTranspose, WrappedPartCommand},
     utils::{is_n, is_sep, ParseUtil},
 };
 
@@ -325,13 +325,14 @@ impl Pass2 {
                 match c {
                     '+' | '-' => {
                         // semitone, required
-                        if working.state > 1 {
+                        if working.state > 2 {
                             panic!("Absolute Transpose: unexpected {c}");
                         }
 
+                        working.jump(2);
+
                         working.eat(c);
                         working.push();
-                        working.jump(2);
                     }
                     '0'..'9' => {
                         // value
@@ -339,13 +340,31 @@ impl Pass2 {
                             panic!("Absolute Transpose: unexpected {c}");
                         }
 
-                        working.eat(c);
                         working.jump(3);
+
+                        working.eat(c);
                     }
                     _ => {
                         // other command
                         working.push();
+
+                        let transpose = match TemporaryTranspose::try_from(working.tokens.clone()) {
+                            Ok(v) => v,
+                            Err(e) => panic!("TemporaryTranspose: {}", e),
+                        };
+                        let w = WrappedPartCommand::new(
+                            working.tokens.first().unwrap().get_code(),
+                            match transpose.command.as_str() {
+                                "_" => PartCommand::AbsoluteTranspose(transpose),
+                                "__" => PartCommand::RelativeTranspose(transpose),
+                                _ => {
+                                    panic!("unexpected transpose command: {})", transpose.command)
+                                }
+                            },
+                        );
                         println!("end: {:?}", working.tokens);
+                        working.commands.push(w);
+
                         working.clear();
 
                         // retry

@@ -278,7 +278,9 @@ impl TryFrom<PartTokenStack> for TemporaryTranspose {
     type Error = Pass2Error;
 
     fn try_from(value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = match value.get_and_cast(0) {
+        println!("==================================================");
+        println!("{:?}", value);
+        let command = match value.get_and_cast(1) {
             Ok(v) => {
                 if let Some(w) = v {
                     w
@@ -289,7 +291,7 @@ impl TryFrom<PartTokenStack> for TemporaryTranspose {
             Err(e) => panic!("TryFrom for TemporaryTranspose (command): {}", e),
         };
 
-        let semitone = match value.get_and_cast::<NegativePositive>(1) {
+        let semitone = match value.get_and_cast::<NegativePositive>(2) {
             Ok(v) => {
                 if let Some(w) = v {
                     w
@@ -300,7 +302,7 @@ impl TryFrom<PartTokenStack> for TemporaryTranspose {
             Err(e) => panic!("TryFrom for TemporaryTranspose (semitone): {}", e),
         };
 
-        let value = match value.get_and_cast::<u8>(2) {
+        let value = match value.get_and_cast::<u8>(3) {
             Ok(v) => {
                 if let Some(w) = v {
                     w
