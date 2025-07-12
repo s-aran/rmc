@@ -9,6 +9,39 @@ use crate::{
     utils::get_type_name,
 };
 
+macro_rules! try_from_get_value {
+    ($expr:expr, $field:ident) => {
+        match $expr {
+            Ok(Some(v)) => v,
+            Ok(None) => panic!(
+                "TryFrom for {} ({}): None",
+                stringify!(Self),
+                stringify!($field)
+            ),
+            Err(e) => panic!(
+                "TryFrom for {} ({}): {}",
+                stringify!($typ),
+                stringify!($field),
+                e
+            ),
+        }
+    };
+}
+
+macro_rules! try_from_get_some_value {
+    ($expr:expr, $field:ident) => {
+        match $expr {
+            Ok(v) => v,
+            Err(e) => panic!(
+                "TryFrom for {} ({}): {}",
+                stringify!(Self),
+                stringify!($field),
+                e
+            ),
+        }
+    };
+}
+
 pub(crate) type State = u8;
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
@@ -195,17 +228,7 @@ impl TryFrom<PartTokenStack> for Note {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = match value.pop_and_cast(0) {
-            Ok(v) => {
-                if let Some(w) = v {
-                    w
-                } else {
-                    panic!("TryFrom for Note (command): command is None");
-                }
-            }
-            Err(e) => panic!("TryFrom for Note (command): {}", e),
-        };
-
+        let command = try_from_get_value!(value.pop_and_cast(0), command);
         let natural = match value.pop_and_cast::<String>(1) {
             Ok(v) => {
                 if let Some(w) = v {
@@ -217,20 +240,10 @@ impl TryFrom<PartTokenStack> for Note {
             Err(e) => panic!("TryFrom for Note (natural): {}", e),
         };
 
-        let semitone = match value.pop_and_cast::<NegativePositive>(2) {
-            Ok(v) => v,
-            Err(e) => panic!("TryFrom for Note (semitone): {}", e),
-        };
-
-        let length = match value.pop_and_cast::<u8>(3) {
-            Ok(v) => v,
-            Err(e) => panic!("TryFrom for Note (lengh): {}", e),
-        };
-
-        let dots = match value.pop_and_cast::<String>(4) {
-            Ok(v) => v,
-            Err(e) => panic!("TryFrom for Note (dots): {}", e),
-        };
+        let semitone =
+            try_from_get_some_value!(value.pop_and_cast::<NegativePositive>(2), semitone);
+        let length = try_from_get_some_value!(value.pop_and_cast::<u8>(3), length);
+        let dots = try_from_get_some_value!(value.pop_and_cast::<String>(4), dots);
 
         Ok(Note {
             command,
@@ -451,32 +464,10 @@ impl TryFrom<PartTokenStack> for TemporaryTranspose {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = match value.pop_and_cast(1) {
-            Ok(v) => {
-                if let Some(w) = v {
-                    w
-                } else {
-                    panic!("TryFrom for TemporaryTranspose (command): command is None");
-                }
-            }
-            Err(e) => panic!("TryFrom for TemporaryTranspose (command): {}", e),
-        };
-
-        let semitone = match value.pop_and_cast::<NegativePositive>(2) {
-            Ok(v) => v,
-            Err(e) => panic!("TryFrom for TemporaryTranspose (semitone): {}", e),
-        };
-
-        let value = match value.pop_and_cast::<u8>(3) {
-            Ok(v) => {
-                if let Some(w) = v {
-                    w
-                } else {
-                    panic!("TryFrom for TemporaryTranspose (value) is None");
-                }
-            }
-            Err(e) => panic!("TryFrom for TemporaryTranspose (value): {}", e),
-        };
+        let command = try_from_get_value!(value.pop_and_cast(1), command);
+        let semitone =
+            try_from_get_some_value!(value.pop_and_cast::<NegativePositive>(2), semitone);
+        let value = try_from_get_value!(value.pop_and_cast(3), value);
 
         Ok(Self {
             command,
@@ -503,22 +494,8 @@ impl TryFrom<PartTokenStack> for PartTransposeBegin {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = match value.pop_and_cast(1) {
-            Ok(v) => {
-                if let Some(w) = v {
-                    w
-                } else {
-                    panic!("TryFrom for PartTranspose (command): command is None");
-                }
-            }
-            Err(e) => panic!("TryFrom for PartTranspose (command): {}", e),
-        };
-
-        let sign = match value.pop_and_cast::<NegativePositiveEqual>(2) {
-            Ok(v) => v,
-            Err(e) => panic!("TryFrom for PartTranspose (sign): {}", e),
-        };
-
+        let command = try_from_get_value!(value.pop_and_cast(1), command);
+        let sign = try_from_get_some_value!(value.pop_and_cast::<NegativePositiveEqual>(2), sign);
         let notes = match value.pop_and_cast_vec::<NoteCommand>(3) {
             Ok(v) => {
                 if v.len() > 0 {
@@ -553,16 +530,7 @@ impl TryFrom<PartTokenStack> for PartTransposeEnd {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = match value.pop_and_cast(0) {
-            Ok(v) => {
-                if let Some(w) = v {
-                    w
-                } else {
-                    panic!("TryFrom for PartTranspose (command): command is None");
-                }
-            }
-            Err(e) => panic!("TryFrom for PartTranspose (command): {}", e),
-        };
+        let command = try_from_get_value!(value.pop_and_cast(0), command);
 
         Ok(Self { command })
     }
@@ -585,32 +553,9 @@ impl TryFrom<PartTokenStack> for MasterTranspose {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = match value.pop_and_cast(1) {
-            Ok(v) => {
-                if let Some(w) = v {
-                    w
-                } else {
-                    panic!("TryFrom for MasterTranspose (command): command is None");
-                }
-            }
-            Err(e) => panic!("TryFrom for MasterTranspose (command): {}", e),
-        };
-
-        let sign = match value.pop_and_cast::<NegativePositive>(2) {
-            Ok(v) => v,
-            Err(e) => panic!("TryFrom for MasterTranspose (sign): {}", e),
-        };
-
-        let value = match value.pop_and_cast::<u8>(3) {
-            Ok(v) => {
-                if let Some(w) = v {
-                    w
-                } else {
-                    panic!("TryFrom for MasterTranspose (value) is None");
-                }
-            }
-            Err(e) => panic!("TryFrom for MasterTranspose (value): {}", e),
-        };
+        let command = try_from_get_value!(value.pop_and_cast(1), command);
+        let sign = try_from_get_some_value!(value.pop_and_cast::<NegativePositive>(2), sign);
+        let value = try_from_get_value!(value.pop_and_cast::<u8>(3), value);
 
         Ok(Self {
             command,
@@ -635,16 +580,7 @@ impl TryFrom<PartTokenStack> for LocalLoopBegin {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = match value.pop_and_cast(0) {
-            Ok(v) => {
-                if let Some(w) = v {
-                    w
-                } else {
-                    panic!("TryFrom for LocalLoopBegin (command): command is None");
-                }
-            }
-            Err(e) => panic!("TryFrom for LocalLoopBegin (command): {}", e),
-        };
+        let command = try_from_get_value!(value.pop_and_cast(0), command);
 
         Ok(Self { command })
     }
@@ -665,16 +601,7 @@ impl TryFrom<PartTokenStack> for LocalLoopFinalBreak {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = match value.pop_and_cast(0) {
-            Ok(v) => {
-                if let Some(w) = v {
-                    w
-                } else {
-                    panic!("TryFrom for LocalLoopFinalBreak (command): command is None");
-                }
-            }
-            Err(e) => panic!("TryFrom for LocalLoopFinalBreak (command): {}", e),
-        };
+        let command = try_from_get_value!(value.pop_and_cast(0), command);
 
         Ok(Self { command })
     }
@@ -696,21 +623,8 @@ impl TryFrom<PartTokenStack> for LocalLoopEnd {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = match value.pop_and_cast(0) {
-            Ok(v) => {
-                if let Some(w) = v {
-                    w
-                } else {
-                    panic!("TryFrom for LocalLoopEnd (command): command is None");
-                }
-            }
-            Err(e) => panic!("TryFrom for LocalLoopEnd (command): {}", e),
-        };
-
-        let count = match value.pop_and_cast::<u8>(1) {
-            Ok(v) => v,
-            Err(e) => panic!("TryFrom for LocalLoopEnd (count): {}", e),
-        };
+        let command = try_from_get_value!(value.pop_and_cast(0), command);
+        let count = try_from_get_some_value!(value.pop_and_cast(1), count);
 
         Ok(Self { command, count })
     }
