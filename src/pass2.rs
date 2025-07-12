@@ -5,7 +5,7 @@ use crate::{
     meta_models::{Code, Command, Pass1Result, Pass2Result, Pass2Working, TokenTrait},
     models::PartSymbol,
     part_command::{Note, PartCommand, TemporaryTranspose, WrappedPartCommand},
-    utils::{is_n, is_sep, ParseUtil},
+    utils::{ParseUtil, is_n, is_sep},
 };
 
 #[derive(Debug, Clone)]
@@ -91,7 +91,6 @@ impl Pass2 {
         let mut working = Pass2Working::default();
 
         let mut command = Command::Nop;
-        let mut commands: Vec<WrappedPartCommand> = vec![];
 
         let new_lined_mml = format!("{}\n", self.mml);
         let mut chars = new_lined_mml.chars();
@@ -134,9 +133,6 @@ impl Pass2 {
                         working.clear();
 
                         result.parts.push((part.clone(), working.commands.clone()));
-
-                        println!("============================================================");
-                        println!("{:?}", result);
                     }
 
                     if let Ok(r) = res {

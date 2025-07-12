@@ -46,7 +46,7 @@ impl<T> MetaData<T> {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Token {
     pub begin: usize,
     pub end: usize,

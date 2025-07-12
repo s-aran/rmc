@@ -8,7 +8,7 @@ use crate::{
 
 pub(crate) type State = u8;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct PartToken {
     state: State,
     code: Code,
@@ -119,6 +119,37 @@ impl PartTokenStack {
             None => Ok(None),
         }
     }
+
+    pub fn pop_by_state(&mut self, state: State) -> Option<PartToken> {
+        let r = self.find_by_state(state);
+        if r.len() > 1 {
+            panic!("pop_by_state({})", state);
+        }
+
+        match r.get(0) {
+            Some(e) => {
+                let t = self
+                    .stack
+                    .remove(self.stack.iter().position(|x| x == *e).unwrap());
+                Some(t)
+            }
+            None => None,
+        }
+    }
+
+    pub fn pop_and_cast<T>(&mut self, state: State) -> Result<Option<T>, <T as FromStr>::Err>
+    where
+        T: FromStr + Clone,
+    {
+        let t = self.pop_by_state(state);
+        match t {
+            Some(e) => match T::from_str(e.token.chars.as_str()) {
+                Ok(v) => Ok(Some(v)),
+                Err(e) => Err(e),
+            },
+            None => Ok(None),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -133,8 +164,8 @@ pub struct Note {
 impl TryFrom<PartTokenStack> for Note {
     type Error = Pass2Error;
 
-    fn try_from(value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = match value.get_and_cast(0) {
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = match value.pop_and_cast(0) {
             Ok(v) => {
                 if let Some(w) = v {
                     w
@@ -145,7 +176,7 @@ impl TryFrom<PartTokenStack> for Note {
             Err(e) => panic!("TryFrom for Note (command): {}", e),
         };
 
-        let natural = match value.get_and_cast::<String>(1) {
+        let natural = match value.pop_and_cast::<String>(1) {
             Ok(v) => {
                 if let Some(w) = v {
                     Some(w == "=")
@@ -156,17 +187,17 @@ impl TryFrom<PartTokenStack> for Note {
             Err(e) => panic!("TryFrom for Note (natural): {}", e),
         };
 
-        let semitone = match value.get_and_cast::<NegativePositive>(2) {
+        let semitone = match value.pop_and_cast::<NegativePositive>(2) {
             Ok(v) => v,
             Err(e) => panic!("TryFrom for Note (semitone): {}", e),
         };
 
-        let length = match value.get_and_cast::<u8>(3) {
+        let length = match value.pop_and_cast::<u8>(3) {
             Ok(v) => v,
             Err(e) => panic!("TryFrom for Note (lengh): {}", e),
         };
 
-        let dots = match value.get_and_cast::<String>(4) {
+        let dots = match value.pop_and_cast::<String>(4) {
             Ok(v) => v,
             Err(e) => panic!("TryFrom for Note (dots): {}", e),
         };
@@ -270,17 +301,15 @@ pub struct Slur {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TemporaryTranspose {
     pub command: String,
-    pub semitone: NegativePositive,
+    pub semitone: Option<NegativePositive>,
     pub value: u8,
 }
 
 impl TryFrom<PartTokenStack> for TemporaryTranspose {
     type Error = Pass2Error;
 
-    fn try_from(value: PartTokenStack) -> Result<Self, Self::Error> {
-        println!("==================================================");
-        println!("{:?}", value);
-        let command = match value.get_and_cast(1) {
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = match value.pop_and_cast(1) {
             Ok(v) => {
                 if let Some(w) = v {
                     w
@@ -291,18 +320,12 @@ impl TryFrom<PartTokenStack> for TemporaryTranspose {
             Err(e) => panic!("TryFrom for TemporaryTranspose (command): {}", e),
         };
 
-        let semitone = match value.get_and_cast::<NegativePositive>(2) {
-            Ok(v) => {
-                if let Some(w) = v {
-                    w
-                } else {
-                    panic!("TryFrom for TemporaryTranspose (semitone) is None");
-                }
-            }
+        let semitone = match value.pop_and_cast::<NegativePositive>(2) {
+            Ok(v) => v,
             Err(e) => panic!("TryFrom for TemporaryTranspose (semitone): {}", e),
         };
 
-        let value = match value.get_and_cast::<u8>(3) {
+        let value = match value.pop_and_cast::<u8>(3) {
             Ok(v) => {
                 if let Some(w) = v {
                     w
@@ -319,6 +342,22 @@ impl TryFrom<PartTokenStack> for TemporaryTranspose {
             value,
         })
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalLoopBegin {
+    command: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalLoopFinalBreak {
+    command: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalLoopEnd {
+    command: String,
+    count: Option<u8>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
