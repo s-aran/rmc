@@ -489,7 +489,10 @@ impl Pass2 {
 
 #[cfg(test)]
 mod tests {
-    use crate::{models::PartSymbol, pass1::Pass1};
+    use crate::{
+        models::{NegativePositive, NegativePositiveEqual, NoteCommand, PartSymbol},
+        pass1::Pass1,
+    };
 
     use super::*;
 
@@ -511,7 +514,273 @@ mod tests {
 
         let g_commands = part_g_list.get(0).unwrap();
         assert_eq!(16, g_commands.len());
-        let g = part_g_list.get(0).unwrap().get(0).unwrap();
+
+        // c+4
+        let expected = Note {
+            command: "c".to_string(),
+            natural: false,
+            semitone: Some(NegativePositive::Positive),
+            length: Some(4),
+            dots: 0,
+        };
+        let actual = g_commands.get(0).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::Note(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // d-12
+        let expected = Note {
+            command: "d".to_string(),
+            natural: false,
+            semitone: Some(NegativePositive::Negative),
+            length: Some(12),
+            dots: 0,
+        };
+        let actual = g_commands.get(1).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::Note(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // e8
+        let expected = Note {
+            command: "e".to_string(),
+            natural: false,
+            semitone: None,
+            length: Some(8),
+            dots: 0,
+        };
+        let actual = g_commands.get(2).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::Note(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // f.
+        let expected = Note {
+            command: "f".to_string(),
+            natural: false,
+            semitone: None,
+            length: None,
+            dots: 1,
+        };
+        let actual = g_commands.get(3).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::Note(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // g=
+        let expected = Note {
+            command: "g".to_string(),
+            natural: true,
+            semitone: None,
+            length: None,
+            dots: 0,
+        };
+        let actual = g_commands.get(4).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::Note(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // a..
+        let expected = Note {
+            command: "a".to_string(),
+            natural: false,
+            semitone: None,
+            length: None,
+            dots: 2,
+        };
+        let actual = g_commands.get(5).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::Note(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // b4....
+        let expected = Note {
+            command: "b".to_string(),
+            natural: false,
+            semitone: None,
+            length: Some(4),
+            dots: 4,
+        };
+        let actual = g_commands.get(6).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::Note(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // _-2
+        let expected = TemporaryTranspose {
+            command: "_".to_string(),
+            semitone: Some(NegativePositive::Negative),
+            value: 2,
+        };
+        let actual = g_commands.get(7).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::AbsoluteTranspose(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // [
+        let expected = LocalLoopBegin {
+            command: "[".to_string(),
+        };
+        let actual = g_commands.get(8).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::LocalLoopBegin(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // e
+        let expected = Note {
+            command: "e".to_string(),
+            natural: false,
+            semitone: None,
+            length: None,
+            dots: 0,
+        };
+        let actual = g_commands.get(9).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::Note(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // __+1
+        let expected = TemporaryTranspose {
+            command: "__".to_string(),
+            semitone: Some(NegativePositive::Positive),
+            value: 1,
+        };
+        let actual = g_commands.get(10).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::RelativeTranspose(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // ]8
+        let expected = LocalLoopEnd {
+            command: "]".to_string(),
+            count: Some(8),
+        };
+        let actual = g_commands.get(11).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::LocalLoopEnd(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // _0
+        let expected = TemporaryTranspose {
+            command: "_".to_string(),
+            semitone: None,
+            value: 0,
+        };
+        let actual = g_commands.get(12).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::AbsoluteTranspose(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // _{-eab
+        let expected = PartTransposeBegin {
+            command: "_{".to_string(),
+            sign: Some(NegativePositiveEqual::Negative),
+            notes: vec![NoteCommand::e, NoteCommand::a, NoteCommand::b],
+        };
+        let actual = g_commands.get(13).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::PartTransposeBegin(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // }
+        let expected = PartTransposeEnd {
+            command: "}".to_string(),
+        };
+        let actual = g_commands.get(14).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::PartTransposeEnd(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
+
+        // _M+120
+        let expected = MasterTranspose {
+            command: "_M".to_string(),
+            sign: Some(NegativePositive::Positive),
+            value: 120,
+        };
+        let actual = g_commands.get(15).unwrap();
+        assert_eq!(
+            expected,
+            if let PartCommand::MasterTranspose(ref c) = *actual.data() {
+                c.clone()
+            } else {
+                panic!("unexpected command: {:?}", actual)
+            }
+        );
     }
 
     #[test]

@@ -218,10 +218,10 @@ pub trait PartCommandStruct: std::fmt::Debug {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Note {
     pub command: String,
-    pub natural: Option<bool>,
+    pub natural: bool,
     pub semitone: Option<NegativePositive>,
     pub length: Option<u8>,
-    pub dots: Option<String>,
+    pub dots: u8,
 }
 
 impl TryFrom<PartTokenStack> for Note {
@@ -229,21 +229,22 @@ impl TryFrom<PartTokenStack> for Note {
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
         let command = try_from_get_value!(value.pop_and_cast(0), command);
-        let natural = match value.pop_and_cast::<String>(1) {
-            Ok(v) => {
-                if let Some(w) = v {
-                    Some(w == "=")
-                } else {
-                    None
-                }
-            }
-            Err(e) => panic!("TryFrom for Note (natural): {}", e),
-        };
+        let natural =
+            if let Some(v) = try_from_get_some_value!(value.pop_and_cast::<String>(1), natural) {
+                v == "="
+            } else {
+                false
+            };
 
         let semitone =
             try_from_get_some_value!(value.pop_and_cast::<NegativePositive>(2), semitone);
         let length = try_from_get_some_value!(value.pop_and_cast::<u8>(3), length);
-        let dots = try_from_get_some_value!(value.pop_and_cast::<String>(4), dots);
+        let dots = if let Some(e) = try_from_get_some_value!(value.pop_and_cast::<String>(4), dots)
+        {
+            e.chars().filter(|&c| c == '.').count() as u8
+        } else {
+            0
+        };
 
         Ok(Note {
             command,
@@ -479,9 +480,9 @@ impl TryFrom<PartTokenStack> for TemporaryTranspose {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PartTransposeBegin {
-    command: String,
-    sign: Option<NegativePositiveEqual>,
-    notes: Vec<NoteCommand>,
+    pub command: String,
+    pub sign: Option<NegativePositiveEqual>,
+    pub notes: Vec<NoteCommand>,
 }
 
 impl PartCommandStruct for PartTransposeBegin {
@@ -517,7 +518,7 @@ impl TryFrom<PartTokenStack> for PartTransposeBegin {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PartTransposeEnd {
-    command: String,
+    pub command: String,
 }
 
 impl PartCommandStruct for PartTransposeEnd {
@@ -538,9 +539,9 @@ impl TryFrom<PartTokenStack> for PartTransposeEnd {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct MasterTranspose {
-    command: String,
-    sign: Option<NegativePositive>,
-    value: u8,
+    pub command: String,
+    pub sign: Option<NegativePositive>,
+    pub value: u8,
 }
 
 impl PartCommandStruct for MasterTranspose {
@@ -567,7 +568,7 @@ impl TryFrom<PartTokenStack> for MasterTranspose {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalLoopBegin {
-    command: String,
+    pub command: String,
 }
 
 impl PartCommandStruct for LocalLoopBegin {
@@ -588,7 +589,7 @@ impl TryFrom<PartTokenStack> for LocalLoopBegin {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalLoopFinalBreak {
-    command: String,
+    pub command: String,
 }
 
 impl PartCommandStruct for LocalLoopFinalBreak {
@@ -609,8 +610,8 @@ impl TryFrom<PartTokenStack> for LocalLoopFinalBreak {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalLoopEnd {
-    command: String,
-    count: Option<u8>,
+    pub command: String,
+    pub count: Option<u8>,
 }
 
 impl PartCommandStruct for LocalLoopEnd {

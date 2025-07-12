@@ -1,6 +1,8 @@
+use std::collections::{self, HashMap, HashSet};
+
 use crate::models::{
-    Comment1, Comment2, ExtendNormalOption, FmToneDefine, Macro, OnOffOption, PartSymbol,
-    ReverseNormalOption, Variable,
+    Comment1, Comment2, ExtendNormalOption, ExtendPartSymbol, FmToneDefine, Macro, OnOffOption,
+    PartSymbol, ReverseNormalOption, Variable,
 };
 use crate::part_command::{PartToken, PartTokenStack, State, WrappedPartCommand};
 
@@ -41,6 +43,14 @@ impl<T> MetaData<T> {
             code: code.clone(),
             data,
         }
+    }
+
+    pub fn code(&self) -> &Code {
+        &self.code
+    }
+
+    pub fn data(&self) -> &T {
+        &self.data
     }
 }
 
