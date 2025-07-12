@@ -35,3 +35,8 @@ pub trait ParseUtil {
 
     fn parse_command(&self, c: char) -> Command;
 }
+
+pub fn get_type_name<T>() -> &'static str {
+    let full = std::any::type_name::<T>();
+    full.rsplit("::").next().unwrap()
+}

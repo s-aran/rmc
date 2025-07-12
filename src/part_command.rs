@@ -2,8 +2,11 @@ use std::str::FromStr;
 
 use crate::{
     errors::Pass2Error,
-    meta_models::{Code, MetaData, Token, TokenStack, TokenStackTrait, TokenTrait},
-    models::{DivisorClock, NegativePositive, NoteCommand},
+    meta_models::{Code, MetaData, Token, TokenStackTrait, TokenTrait},
+    models::{
+        DivisorClock, NegativePositive, NegativePositiveEqual, NoteCommand, NoteOctaveCommand,
+    },
+    utils::get_type_name,
 };
 
 pub(crate) type State = u8;
@@ -120,10 +123,17 @@ impl PartTokenStack {
         }
     }
 
+    pub fn pop_by_state_all(&mut self, state: State) -> Vec<PartToken> {
+        let (removed, kept) = self.stack.drain(..).partition(|e| e.state == state);
+        self.stack = kept;
+
+        removed
+    }
+
     pub fn pop_by_state(&mut self, state: State) -> Option<PartToken> {
         let r = self.find_by_state(state);
         if r.len() > 1 {
-            panic!("pop_by_state({})", state);
+            panic!("pop_by_state({}): len > 1", state);
         }
 
         match r.get(0) {
@@ -135,6 +145,22 @@ impl PartTokenStack {
             }
             None => None,
         }
+    }
+
+    pub fn pop_and_cast_vec<T>(&mut self, state: State) -> Result<Vec<T>, <T as FromStr>::Err>
+    where
+        T: FromStr + Clone,
+    {
+        let t = self.pop_by_state_all(state);
+        Ok(t.iter()
+            .map(|e| {
+                if let Ok(v) = T::from_str(e.token.chars.as_str()) {
+                    v
+                } else {
+                    panic!("pop_and_cast_vec<{}>", get_type_name::<T>());
+                }
+            })
+            .collect())
     }
 
     pub fn pop_and_cast<T>(&mut self, state: State) -> Result<Option<T>, <T as FromStr>::Err>
@@ -150,6 +176,10 @@ impl PartTokenStack {
             None => Ok(None),
         }
     }
+}
+
+pub trait PartCommandStruct: std::fmt::Debug {
+    fn to_variant(self) -> PartCommand;
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -212,10 +242,22 @@ impl TryFrom<PartTokenStack> for Note {
     }
 }
 
+impl PartCommandStruct for Note {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::Note(self)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NoteX {
     pub length: Option<u8>,
     pub dots: Option<String>,
+}
+
+impl PartCommandStruct for NoteX {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::NoteX(self)
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -224,13 +266,25 @@ pub struct NoteR {
     pub dots: Option<String>,
 }
 
+impl PartCommandStruct for NoteR {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::NoteR(self)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PortamentoBegin {
-    pub pitch1: Option<NoteCommand>,
-    pub pitch2: Option<NoteCommand>,
+    pub pitch1: Option<NoteOctaveCommand>,
+    pub pitch2: Option<NoteOctaveCommand>,
     pub length1: Option<u8>,
     pub dots: Option<String>,
     pub length2: Option<u8>,
+}
+
+impl PartCommandStruct for PortamentoBegin {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::Portamento(self)
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -238,26 +292,68 @@ pub struct Octave {
     pub value: u8,
 }
 
+impl PartCommandStruct for Octave {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::Octave(self)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct OctaveUp;
+
+impl PartCommandStruct for OctaveUp {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::OctaveUp
+    }
+}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct OctaveDown;
 
+impl PartCommandStruct for OctaveDown {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::OctaveDown
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct OctaveReverse;
+
+impl PartCommandStruct for OctaveReverse {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::OctaveReverse
+    }
+}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PartOctaveChangePositive;
 
+impl PartCommandStruct for PartOctaveChangePositive {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::PartOctaveChangePositive
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PartOctaveChangeNegative;
+
+impl PartCommandStruct for PartOctaveChangeNegative {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::PartOctaveChangeNegative
+    }
+}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DefaultLength {
     pub value_type: Option<DivisorClock>,
     pub value: u8,
     pub dots: Option<String>,
+}
+
+impl PartCommandStruct for DefaultLength {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::DefaultLength(self)
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -267,11 +363,23 @@ pub struct ProcessLastLengthUpdate {
     pub dots: Option<String>,
 }
 
+impl PartCommandStruct for ProcessLastLengthUpdate {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::ProcessLastLengthUpdate(self)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ProcessLastLengthAdd {
     pub value_type: Option<DivisorClock>,
     pub value: u8,
     pub dots: Option<String>,
+}
+
+impl PartCommandStruct for ProcessLastLengthAdd {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::ProcessLastLengthAdd(self)
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -281,9 +389,21 @@ pub struct ProcessLastLengthSubtract {
     pub dots: Option<String>,
 }
 
+impl PartCommandStruct for ProcessLastLengthSubtract {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::ProcessLastLengthSubtract(self)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ProcessLastLengthMultiply {
     pub value: u8,
+}
+
+impl PartCommandStruct for ProcessLastLengthMultiply {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::ProcessLastLengthMultiply(self)
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -292,10 +412,22 @@ pub struct Tie {
     pub dots: Option<String>,
 }
 
+impl PartCommandStruct for Tie {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::Tie(self)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Slur {
     pub length: Option<u8>,
     pub dots: Option<String>,
+}
+
+impl PartCommandStruct for Slur {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::Slur(self)
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -303,6 +435,16 @@ pub struct TemporaryTranspose {
     pub command: String,
     pub semitone: Option<NegativePositive>,
     pub value: u8,
+}
+
+impl PartCommandStruct for TemporaryTranspose {
+    fn to_variant(self) -> PartCommand {
+        match self.command.as_str() {
+            "_" => PartCommand::AbsoluteTranspose(self),
+            "__" => PartCommand::RelativeTranspose(self),
+            _ => panic!("ConvertPartCommand: unexpected command {}", self.command),
+        }
+    }
 }
 
 impl TryFrom<PartTokenStack> for TemporaryTranspose {
@@ -344,9 +486,168 @@ impl TryFrom<PartTokenStack> for TemporaryTranspose {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PartTransposeBegin {
+    command: String,
+    sign: Option<NegativePositiveEqual>,
+    notes: Vec<NoteCommand>,
+}
+
+impl PartCommandStruct for PartTransposeBegin {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::PartTransposeBegin(self)
+    }
+}
+
+impl TryFrom<PartTokenStack> for PartTransposeBegin {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = match value.pop_and_cast(1) {
+            Ok(v) => {
+                if let Some(w) = v {
+                    w
+                } else {
+                    panic!("TryFrom for PartTranspose (command): command is None");
+                }
+            }
+            Err(e) => panic!("TryFrom for PartTranspose (command): {}", e),
+        };
+
+        let sign = match value.pop_and_cast::<NegativePositiveEqual>(2) {
+            Ok(v) => v,
+            Err(e) => panic!("TryFrom for PartTranspose (sign): {}", e),
+        };
+
+        let notes = match value.pop_and_cast_vec::<NoteCommand>(3) {
+            Ok(v) => {
+                if v.len() > 0 {
+                    v
+                } else {
+                    panic!("TryFrom for PartTranspose (notes) is empty");
+                }
+            }
+            Err(e) => panic!("TryFrom for PartTranspose (notes): {}", e),
+        };
+
+        Ok(Self {
+            command,
+            sign,
+            notes,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PartTransposeEnd {
+    command: String,
+}
+
+impl PartCommandStruct for PartTransposeEnd {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::PartTransposeEnd(self)
+    }
+}
+
+impl TryFrom<PartTokenStack> for PartTransposeEnd {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = match value.pop_and_cast(0) {
+            Ok(v) => {
+                if let Some(w) = v {
+                    w
+                } else {
+                    panic!("TryFrom for PartTranspose (command): command is None");
+                }
+            }
+            Err(e) => panic!("TryFrom for PartTranspose (command): {}", e),
+        };
+
+        Ok(Self { command })
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct MasterTranspose {
+    command: String,
+    sign: Option<NegativePositive>,
+    value: u8,
+}
+
+impl PartCommandStruct for MasterTranspose {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::MasterTranspose(self)
+    }
+}
+
+impl TryFrom<PartTokenStack> for MasterTranspose {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = match value.pop_and_cast(1) {
+            Ok(v) => {
+                if let Some(w) = v {
+                    w
+                } else {
+                    panic!("TryFrom for MasterTranspose (command): command is None");
+                }
+            }
+            Err(e) => panic!("TryFrom for MasterTranspose (command): {}", e),
+        };
+
+        let sign = match value.pop_and_cast::<NegativePositive>(2) {
+            Ok(v) => v,
+            Err(e) => panic!("TryFrom for MasterTranspose (sign): {}", e),
+        };
+
+        let value = match value.pop_and_cast::<u8>(3) {
+            Ok(v) => {
+                if let Some(w) = v {
+                    w
+                } else {
+                    panic!("TryFrom for MasterTranspose (value) is None");
+                }
+            }
+            Err(e) => panic!("TryFrom for MasterTranspose (value): {}", e),
+        };
+
+        Ok(Self {
+            command,
+            sign,
+            value,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalLoopBegin {
     command: String,
+}
+
+impl PartCommandStruct for LocalLoopBegin {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::LocalLoopBegin(self)
+    }
+}
+
+impl TryFrom<PartTokenStack> for LocalLoopBegin {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = match value.pop_and_cast(0) {
+            Ok(v) => {
+                if let Some(w) = v {
+                    w
+                } else {
+                    panic!("TryFrom for LocalLoopBegin (command): command is None");
+                }
+            }
+            Err(e) => panic!("TryFrom for LocalLoopBegin (command): {}", e),
+        };
+
+        Ok(Self { command })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -354,10 +655,65 @@ pub struct LocalLoopFinalBreak {
     command: String,
 }
 
+impl PartCommandStruct for LocalLoopFinalBreak {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::LocalLoopFinalBreak(self)
+    }
+}
+
+impl TryFrom<PartTokenStack> for LocalLoopFinalBreak {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = match value.pop_and_cast(0) {
+            Ok(v) => {
+                if let Some(w) = v {
+                    w
+                } else {
+                    panic!("TryFrom for LocalLoopFinalBreak (command): command is None");
+                }
+            }
+            Err(e) => panic!("TryFrom for LocalLoopFinalBreak (command): {}", e),
+        };
+
+        Ok(Self { command })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalLoopEnd {
     command: String,
     count: Option<u8>,
+}
+
+impl PartCommandStruct for LocalLoopEnd {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::LocalLoopEnd(self)
+    }
+}
+
+impl TryFrom<PartTokenStack> for LocalLoopEnd {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = match value.pop_and_cast(0) {
+            Ok(v) => {
+                if let Some(w) = v {
+                    w
+                } else {
+                    panic!("TryFrom for LocalLoopEnd (command): command is None");
+                }
+            }
+            Err(e) => panic!("TryFrom for LocalLoopEnd (command): {}", e),
+        };
+
+        let count = match value.pop_and_cast::<u8>(1) {
+            Ok(v) => v,
+            Err(e) => panic!("TryFrom for LocalLoopEnd (count): {}", e),
+        };
+
+        Ok(Self { command, count })
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -389,7 +745,17 @@ pub enum PartCommand {
 
     AbsoluteTranspose(TemporaryTranspose),
     RelativeTranspose(TemporaryTranspose),
+    PartTransposeBegin(PartTransposeBegin),
+    PartTransposeEnd(PartTransposeEnd),
+    MasterTranspose(MasterTranspose),
+
+    LocalLoopBegin(LocalLoopBegin),
+    LocalLoopFinalBreak(LocalLoopFinalBreak),
+    LocalLoopEnd(LocalLoopEnd),
 }
+
+pub trait IsPartCommand {}
+impl IsPartCommand for PartCommand {}
 
 pub type WrappedPartCommand = MetaData<PartCommand>;
 

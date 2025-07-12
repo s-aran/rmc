@@ -97,6 +97,16 @@ pub enum NegativePositive {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumString)]
+pub enum NegativePositiveEqual {
+    #[strum(serialize = "-")]
+    Negative,
+    #[strum(serialize = "+")]
+    Positive,
+    #[strum(serialize = "=")]
+    Equal,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, strum::EnumString)]
 pub enum DivisorClock {
     #[strum(serialize = "")]
     Divisor,
@@ -1423,6 +1433,18 @@ impl From<Macro> for TransposeMacro {
 #[derive(Debug, Clone, Eq, PartialEq, strum::EnumString)]
 #[allow(non_camel_case_types)]
 pub enum NoteCommand {
+    c,
+    d,
+    e,
+    f,
+    g,
+    a,
+    b,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, strum::EnumString)]
+#[allow(non_camel_case_types)]
+pub enum NoteOctaveCommand {
     c,
     d,
     e,

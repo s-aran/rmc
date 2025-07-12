@@ -4,8 +4,12 @@ use crate::{
     errors::Pass2Error,
     meta_models::{Code, Command, Pass1Result, Pass2Result, Pass2Working, TokenTrait},
     models::PartSymbol,
-    part_command::{Note, PartCommand, TemporaryTranspose, WrappedPartCommand},
-    utils::{ParseUtil, is_n, is_sep},
+    part_command::{
+        LocalLoopBegin, LocalLoopEnd, LocalLoopFinalBreak, MasterTranspose, Note, PartCommand,
+        PartCommandStruct, PartTokenStack, PartTransposeBegin, PartTransposeEnd,
+        TemporaryTranspose, WrappedPartCommand,
+    },
+    utils::{ParseUtil, get_type_name, is_n, is_sep},
 };
 
 #[derive(Debug, Clone)]
@@ -240,6 +244,8 @@ impl Pass2 {
                         // TODO: define pseudo command
                         return Ok(PartCommand::Nop);
                     }
+
+                    panic!("unexpected : command")
                 }
                 _ => {
                     panic!("unknwon command: {c}");
@@ -295,22 +301,8 @@ impl Pass2 {
                     _ => {
                         // other command
                         working.push();
-                        let note = match Note::try_from(working.tokens.clone()) {
-                            Ok(v) => v,
-                            Err(e) => panic!("Note: {}", e),
-                        };
-                        let w = WrappedPartCommand::new(
-                            working.tokens.first().unwrap().get_code(),
-                            PartCommand::Note(note),
-                        );
 
-                        println!("end: {:?} // {:?}", working.tokens, w);
-                        working.commands.push(w);
-                        // let instance = Note::From();
-                        // working
-                        //     .commands
-                        //     .push(PartCommand::Note(working.command_code, instance));
-                        working.clear();
+                        Self::push_part_command::<Note>(working);
 
                         // retry
                         return self.parse_part_command(working, c);
@@ -320,8 +312,8 @@ impl Pass2 {
             "_" | "__" => {
                 match c {
                     '+' | '-' => {
-                        // semitone, required
-                        if working.state > 2 {
+                        // semitone, optional
+                        if working.state > 1 {
                             panic!("Absolute Transpose: unexpected {c}");
                         }
 
@@ -344,22 +336,7 @@ impl Pass2 {
                         // other command
                         working.push();
 
-                        let transpose = match TemporaryTranspose::try_from(working.tokens.clone()) {
-                            Ok(v) => v,
-                            Err(e) => panic!("TemporaryTranspose: {}", e),
-                        };
-                        let w = WrappedPartCommand::new(
-                            working.tokens.first().unwrap().get_code(),
-                            match transpose.command.as_str() {
-                                "_" => PartCommand::AbsoluteTranspose(transpose),
-                                "__" => PartCommand::RelativeTranspose(transpose),
-                                _ => {
-                                    panic!("unexpected transpose command: {})", transpose.command)
-                                }
-                            },
-                        );
-                        println!("end: {:?}", working.tokens);
-                        working.commands.push(w);
+                        Self::push_part_command::<TemporaryTranspose>(working);
 
                         working.clear();
 
@@ -371,29 +348,30 @@ impl Pass2 {
             "_{" => {
                 match c {
                     '+' | '-' | '=' => {
-                        // semitone|natural, required
-                        if working.state > 1 {
-                            panic!("Ranged Transpose: unexpected {c}");
+                        // semitone|natural, optional
+                        if working.state > 2 {
+                            panic!("Part Transpose: unexpected {c}");
                         }
+
+                        working.jump(2);
 
                         working.eat(c);
                         working.push();
-                        working.jump(2);
                     }
                     'c' | 'd' | 'e' | 'f' | 'g' | 'a' | 'b' => {
                         if working.state > 3 {
-                            panic!("Ranged Transpose: unexpected {c}");
+                            panic!("Part Transpose: unexpected {c}");
                         }
 
+                        working.jump(3);
                         working.eat(c);
                         working.push();
-                        working.jump(3);
                     }
                     _ => {
                         // other command
                         working.push();
-                        println!("end: {:?}", working.tokens);
-                        working.clear();
+
+                        Self::push_part_command::<PartTransposeBegin>(working);
 
                         // retry
                         return self.parse_part_command(working, c);
@@ -402,8 +380,8 @@ impl Pass2 {
             }
             "}" => {
                 working.push();
-                println!("end: {:?}", working.tokens);
-                working.clear();
+
+                Self::push_part_command::<PartTransposeEnd>(working);
 
                 // retry
                 return self.parse_part_command(working, c);
@@ -411,14 +389,15 @@ impl Pass2 {
             "_M" => {
                 match c {
                     '+' | '-' => {
-                        // semitone, required
+                        // semitone, optional
                         if working.state > 1 {
                             panic!("Master Transpose: unexpected {c}");
                         }
 
+                        working.jump(2);
+
                         working.eat(c);
                         working.push();
-                        working.jump(2);
                     }
                     '0'..'9' => {
                         // value
@@ -432,8 +411,8 @@ impl Pass2 {
                     _ => {
                         // other command
                         working.push();
-                        println!("end: {:?}", working.tokens);
-                        working.clear();
+
+                        Self::push_part_command::<MasterTranspose>(working);
 
                         // retry
                         return self.parse_part_command(working, c);
@@ -441,10 +420,15 @@ impl Pass2 {
                 }
             }
             "[" => {
-                // other command
+                Self::push_part_command::<LocalLoopBegin>(working);
+
+                // retry
+                return self.parse_part_command(working, c);
+            }
+            ":" => {
                 working.push();
-                println!("end: {:?}", working.tokens);
-                working.clear();
+
+                Self::push_part_command::<LocalLoopFinalBreak>(working);
 
                 // retry
                 return self.parse_part_command(working, c);
@@ -453,19 +437,18 @@ impl Pass2 {
                 match c {
                     '0'..'9' => {
                         // loop count
-                        if working.state > 2 {
+                        if working.state > 1 {
                             panic!("Loop: unexpected {c}");
                         }
 
+                        working.jump(1);
                         working.eat(c);
-                        working.push();
-                        working.jump(2);
                     }
                     _ => {
                         // other command
                         working.push();
-                        println!("end: {:?}", working.tokens);
-                        working.clear();
+
+                        Self::push_part_command::<LocalLoopEnd>(working);
 
                         // retry
                         return self.parse_part_command(working, c);
@@ -478,6 +461,29 @@ impl Pass2 {
         }
 
         Ok(PartCommand::Nop)
+    }
+
+    fn push_part_command<T>(working: &mut Pass2Working)
+    where
+        T: TryFrom<PartTokenStack, Error = Pass2Error> + PartCommandStruct,
+    {
+        println!("==> {}: {:?}", get_type_name::<T>(), working.tokens);
+        let command = match T::try_from(working.tokens.clone()) {
+            Ok(v) => v,
+            Err(e) => panic!("{}: {}", get_type_name::<T>(), e),
+        };
+
+        println!("end: {}: {:?}", get_type_name::<T>(), command);
+
+        let w = WrappedPartCommand::new(
+            working.tokens.first().unwrap().get_code(),
+            command.to_variant(),
+        );
+
+        // println!("end: {:?}", working.tokens);
+        working.commands.push(w);
+
+        working.clear();
     }
 }
 
@@ -504,7 +510,7 @@ mod tests {
         assert_eq!(1, part_g_list.len());
 
         let g_commands = part_g_list.get(0).unwrap();
-        assert_eq!(15, g_commands.len());
+        assert_eq!(16, g_commands.len());
         let g = part_g_list.get(0).unwrap().get(0).unwrap();
     }
 
