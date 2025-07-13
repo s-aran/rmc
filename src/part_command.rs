@@ -303,57 +303,92 @@ impl PartCommandStruct for PortamentoBegin {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Octave {
+    pub command: String,
     pub value: u8,
 }
 
 impl PartCommandStruct for Octave {
     fn to_variant(self) -> PartCommand {
-        PartCommand::Octave(self)
+        match self.command.as_str() {
+            "o" => PartCommand::Octave(self),
+            "o+" => PartCommand::PartOctaveChangePositive(self),
+            "o-" => PartCommand::PartOctaveChangeNegative(self),
+            _ => panic!("PartOctaveChange: unexpected command {}", self.command),
+        }
+    }
+}
+
+impl TryFrom<PartTokenStack> for Octave {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = try_from_get_value!(value.pop_and_cast::<String>(1), value);
+        let value = try_from_get_value!(value.pop_and_cast::<u8>(2), value);
+
+        Ok(Octave { command, value })
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct OctaveUp;
+pub struct OctaveUp {
+    pub command: String,
+}
 
 impl PartCommandStruct for OctaveUp {
     fn to_variant(self) -> PartCommand {
-        PartCommand::OctaveUp
+        PartCommand::OctaveUp(self)
+    }
+}
+
+impl TryFrom<PartTokenStack> for OctaveUp {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = try_from_get_value!(value.pop_and_cast::<String>(0), value);
+
+        Ok(OctaveUp { command })
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct OctaveDown;
+pub struct OctaveDown {
+    pub command: String,
+}
 
 impl PartCommandStruct for OctaveDown {
     fn to_variant(self) -> PartCommand {
-        PartCommand::OctaveDown
+        PartCommand::OctaveDown(self)
+    }
+}
+
+impl TryFrom<PartTokenStack> for OctaveDown {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = try_from_get_value!(value.pop_and_cast::<String>(0), value);
+
+        Ok(OctaveDown { command })
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct OctaveReverse;
+pub struct OctaveReverse {
+    pub command: String,
+}
 
 impl PartCommandStruct for OctaveReverse {
     fn to_variant(self) -> PartCommand {
-        PartCommand::OctaveReverse
+        PartCommand::OctaveReverse(self)
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct PartOctaveChangePositive;
+impl TryFrom<PartTokenStack> for OctaveReverse {
+    type Error = Pass2Error;
 
-impl PartCommandStruct for PartOctaveChangePositive {
-    fn to_variant(self) -> PartCommand {
-        PartCommand::PartOctaveChangePositive
-    }
-}
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = try_from_get_value!(value.pop_and_cast::<String>(0), value);
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct PartOctaveChangeNegative;
-
-impl PartCommandStruct for PartOctaveChangeNegative {
-    fn to_variant(self) -> PartCommand {
-        PartCommand::PartOctaveChangeNegative
+        Ok(OctaveReverse { command })
     }
 }
 
@@ -631,6 +666,258 @@ impl TryFrom<PartTokenStack> for LocalLoopEnd {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SsgPcmSoftwareEnvelope {
+    pub command: String,
+    pub value1: u8,         // 0..255 || 0..31
+    pub value2: i8,         // -15..+15 || 0..31
+    pub value3: u8,         // 0..255 || 0..31
+    pub value4: u8,         // 0.255 || 0..15
+    pub value5: Option<u8>, // None || 0..15
+    pub value6: Option<u8>, // None || 0..15
+}
+
+impl PartCommandStruct for SsgPcmSoftwareEnvelope {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::SsgPcmSoftwareEnvelope(self)
+    }
+}
+
+impl TryFrom<PartTokenStack> for SsgPcmSoftwareEnvelope {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = try_from_get_value!(value.pop_and_cast(0), command);
+        let value1 = try_from_get_value!(value.pop_and_cast(1), value1);
+
+        let value2_sign = try_from_get_some_value!(value.pop_and_cast(2), value2_sign);
+        let value2_value = try_from_get_value!(value.pop_and_cast(3), value2);
+        let value2 = to_some_i8(value2_sign, Some(value2_value)).unwrap();
+
+        let value3 = try_from_get_value!(value.pop_and_cast(4), value3);
+        let value4 = try_from_get_value!(value.pop_and_cast(5), value4);
+        let value5 = try_from_get_some_value!(value.pop_and_cast(6), value5);
+        let value6 = try_from_get_some_value!(value.pop_and_cast(7), value6);
+
+        Ok(Self {
+            command,
+            value1,
+            value2,
+            value3,
+            value4,
+            value5,
+            value6,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Volume {
+    pub command: String,
+    pub value: u8,
+}
+
+impl PartCommandStruct for Volume {
+    fn to_variant(self) -> PartCommand {
+        match self.command.as_str() {
+            "v" => PartCommand::Volume1(self),
+            "V" => PartCommand::Volume2(self),
+            "v+" => PartCommand::GlobalVolume1Positive(self),
+            "v-" => PartCommand::GlobalVolume1Negative(self),
+            "v)" => PartCommand::GlobalVolume2Positive(self),
+            "v(" => PartCommand::GlobalVolume2Negative(self),
+            _ => {
+                panic!("unexpected command: {}", self.command);
+            }
+        }
+    }
+}
+
+impl TryFrom<PartTokenStack> for Volume {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = try_from_get_value!(value.pop_and_cast(1), command);
+        let value = try_from_get_value!(value.pop_and_cast(2), value);
+
+        Ok(Self { command, value })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Quantize1 {
+    pub command: String,
+    pub divisor: Option<DivisorClock>,
+    pub value: u8,
+}
+
+impl PartCommandStruct for Quantize1 {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::Quantize1(self)
+    }
+}
+
+impl TryFrom<PartTokenStack> for Quantize1 {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = try_from_get_value!(value.pop_and_cast(1), command);
+        let divisor = try_from_get_some_value!(value.pop_and_cast::<DivisorClock>(2), divisor);
+        let value = try_from_get_value!(value.pop_and_cast(3), value);
+
+        Ok(Self {
+            command,
+            divisor,
+            value,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Quantize2 {
+    pub command: String,
+    pub value1: Option<u8>,
+    pub value1_dots: u8,
+    pub value2: Option<u8>,
+    pub value3: Option<u8>,
+    pub value3_dots: u8,
+}
+
+impl PartCommandStruct for Quantize2 {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::Quantize2(self)
+    }
+}
+
+impl Quantize2 {
+    fn command_type_1(mut value: PartTokenStack) -> Result<Self, Pass2Error> {
+        let command = try_from_get_value!(value.pop_and_cast(0), command);
+        let value1 = try_from_get_some_value!(value.pop_and_cast(1), value1);
+        let value1_dots = 0;
+
+        let has_range =
+            if let Some(v) = try_from_get_some_value!(value.pop_and_cast::<String>(2), range) {
+                Some(v == "-")
+            } else {
+                None
+            };
+
+        let value2 = try_from_get_some_value!(value.pop_and_cast(3), value2);
+        if value2.is_some()
+            && let Some(v) = has_range
+        {
+            if !v {
+                panic!("Quantize2 (format 1): unexpected range");
+            }
+        }
+
+        let value3 = try_from_get_some_value!(value.pop_and_cast(4), value3);
+        let value3_dots = 0;
+
+        Ok(Self {
+            command,
+            value1,
+            value1_dots,
+            value2,
+            value3,
+            value3_dots,
+        })
+    }
+
+    fn command_type_2(mut value: PartTokenStack) -> Result<Self, Pass2Error> {
+        let command = try_from_get_value!(value.pop_and_cast(0), command);
+
+        let has_value1_l =
+            if let Some(v) = try_from_get_some_value!(value.pop_and_cast::<String>(1), value1_l) {
+                Some(v != "l")
+            } else {
+                None
+            };
+
+        let value1 = try_from_get_some_value!(value.pop_and_cast(2), value1);
+        if value1.is_some()
+            && let Some(v) = has_value1_l
+            && !v
+        {
+            panic!("Quantize2 (format 2): l is not specified in value1");
+        }
+        let value1_dots = count_dots(try_from_get_some_value!(value.pop_and_cast(3), value1_dots));
+
+        let has_range =
+            if let Some(v) = try_from_get_some_value!(value.pop_and_cast::<String>(4), range) {
+                Some(v == "-")
+            } else {
+                None
+            };
+
+        let has_value2_l =
+            if let Some(v) = try_from_get_some_value!(value.pop_and_cast::<String>(5), value1_l) {
+                Some(v != "l")
+            } else {
+                None
+            };
+
+        let value2 = try_from_get_some_value!(value.pop_and_cast(6), value2);
+        if value2.is_some() {
+            if let Some(v) = has_range
+                && !v
+            {
+                panic!("Quantize2 (format 2): unexpected range");
+            }
+
+            if let Some(v) = has_value2_l
+                && !v
+            {
+                panic!("Quantize2 (format 2): l is not specified in value2");
+            }
+        }
+
+        let has_value3_l =
+            if let Some(v) = try_from_get_some_value!(value.pop_and_cast::<String>(7), value1_l) {
+                Some(v != "l")
+            } else {
+                None
+            };
+
+        let value3 = try_from_get_some_value!(value.pop_and_cast(8), value3);
+        if value1.is_some()
+            && let Some(v) = has_value3_l
+            && !v
+        {
+            panic!("Quantize2 (format 2): l is not specified in value3");
+        }
+        let value3_dots = count_dots(try_from_get_some_value!(
+            value.pop_and_cast(10),
+            value3_dots
+        ));
+
+        Ok(Self {
+            command,
+            value1,
+            value1_dots,
+            value2,
+            value3,
+            value3_dots,
+        })
+    }
+}
+
+impl TryFrom<PartTokenStack> for Quantize2 {
+    type Error = Pass2Error;
+
+    fn try_from(value: PartTokenStack) -> Result<Self, Self::Error> {
+        if let Ok(Some(v)) = value.get_and_cast::<String>(1) {
+            if v == "l" {
+                Self::command_type_2(value)
+            } else {
+                Self::command_type_1(value)
+            }
+        } else {
+            Self::command_type_1(value)
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PartCommand {
     Nop,
@@ -642,11 +929,11 @@ pub enum PartCommand {
     Portamento(PortamentoBegin),
 
     Octave(Octave),
-    OctaveUp,
-    OctaveDown,
-    OctaveReverse,
-    PartOctaveChangePositive,
-    PartOctaveChangeNegative,
+    OctaveUp(OctaveUp),
+    OctaveDown(OctaveDown),
+    OctaveReverse(OctaveReverse),
+    PartOctaveChangePositive(Octave),
+    PartOctaveChangeNegative(Octave),
 
     DefaultLength(DefaultLength),
 
@@ -658,6 +945,8 @@ pub enum PartCommand {
     Tie(Tie),
     Slur(Slur),
 
+    Quantize1(Quantize1),
+    Quantize2(Quantize2),
     AbsoluteTranspose(TemporaryTranspose),
     RelativeTranspose(TemporaryTranspose),
     PartTransposeBegin(PartTransposeBegin),
@@ -667,12 +956,40 @@ pub enum PartCommand {
     LocalLoopBegin(LocalLoopBegin),
     LocalLoopFinalBreak(LocalLoopFinalBreak),
     LocalLoopEnd(LocalLoopEnd),
+
+    SsgPcmSoftwareEnvelope(SsgPcmSoftwareEnvelope),
+
+    Volume1(Volume),
+    Volume2(Volume),
+    GlobalVolume1Positive(Volume),
+    GlobalVolume1Negative(Volume),
+    GlobalVolume2Positive(Volume),
+    GlobalVolume2Negative(Volume),
 }
 
 pub trait IsPartCommand {}
 impl IsPartCommand for PartCommand {}
 
 pub type WrappedPartCommand = MetaData<PartCommand>;
+
+fn to_some_i8(sign: Option<NegativePositive>, value: Option<u8>) -> Option<i8> {
+    if value.is_none() {
+        return None;
+    }
+
+    Some(match sign {
+        Some(NegativePositive::Positive) | None => value.unwrap() as i8,
+        Some(NegativePositive::Negative) => -(value.unwrap() as i8),
+    })
+}
+
+fn count_dots(dots: Option<String>) -> u8 {
+    if let Some(dots) = dots {
+        dots.chars().filter(|&c| c == '.').count() as u8
+    } else {
+        0
+    }
+}
 
 #[cfg(test)]
 mod tests {

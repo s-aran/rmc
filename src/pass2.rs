@@ -5,9 +5,10 @@ use crate::{
     meta_models::{Code, Command, Pass1Result, Pass2Result, Pass2Working, TokenTrait},
     models::PartSymbol,
     part_command::{
-        LocalLoopBegin, LocalLoopEnd, LocalLoopFinalBreak, MasterTranspose, Note, PartCommand,
-        PartCommandStruct, PartTokenStack, PartTransposeBegin, PartTransposeEnd,
-        TemporaryTranspose, WrappedPartCommand,
+        LocalLoopBegin, LocalLoopEnd, LocalLoopFinalBreak, MasterTranspose, Note, Octave,
+        PartCommand, PartCommandStruct, PartTokenStack, PartTransposeBegin, PartTransposeEnd,
+        Quantize1, Quantize2, SsgPcmSoftwareEnvelope, TemporaryTranspose, Volume,
+        WrappedPartCommand,
     },
     utils::{ParseUtil, get_type_name, is_n, is_sep},
 };
@@ -122,8 +123,6 @@ impl Pass2 {
                     command = Command::Nop;
                 }
                 Command::Part(_, ref part) => 'part_command: {
-                    println!("{c} ==> {:?}: {:?}", part, working.tokens);
-
                     // let w = WrappedPartCommand::new(self.get_code(), part_command.clone());
                     // commands.push(w);
                     working.code = self.code.clone();
@@ -131,7 +130,6 @@ impl Pass2 {
                     if is_n(c) {
                         if !working.token.is_empty() {
                             working.push();
-                            println!("end: {:?}", working.tokens);
                         }
 
                         working.clear();
@@ -166,6 +164,7 @@ impl Pass2 {
             maybe_c = chars.next();
             if is_n(c) {
                 self.code.inc_lines();
+                command = Command::Nop;
             }
         }
 
@@ -199,6 +198,24 @@ impl Pass2 {
                     working.push();
                     working.jump(1);
                     return Ok(PartCommand::Nop);
+                }
+                "o" => {
+                    if working.state <= 0 {
+                        working.jump(1);
+                        return Ok(PartCommand::Nop);
+                    }
+
+                    match c {
+                        '+' | '-' => {
+                            working.eat(c);
+                            working.push();
+                            return Ok(PartCommand::Nop);
+                        }
+                        _ => {
+                            working.push();
+                            // fall
+                        }
+                    }
                 }
                 "_" => {
                     if working.state <= 0 {
@@ -246,6 +263,44 @@ impl Pass2 {
                     }
 
                     panic!("unexpected : command")
+                }
+                "E" => {
+                    working.push();
+                    working.jump(1);
+                    return Ok(PartCommand::Nop);
+                }
+                "v" => {
+                    if working.state <= 0 {
+                        working.jump(1);
+                        return Ok(PartCommand::Nop);
+                    }
+
+                    match c {
+                        '+' | '-' | ')' | '(' => {
+                            working.eat(c);
+                            working.push();
+                            return Ok(PartCommand::Nop);
+                        }
+                        _ => {
+                            working.push();
+                            // fall
+                        }
+                    }
+                }
+                "V" => {
+                    working.push();
+                    working.jump(1);
+                    return Ok(PartCommand::Nop);
+                }
+                "q" => {
+                    working.push();
+                    working.jump(1);
+                    return Ok(PartCommand::Nop);
+                }
+                "Q" => {
+                    working.push();
+                    working.jump(1);
+                    return Ok(PartCommand::Nop);
                 }
                 _ => {
                     panic!("unknwon command: {c}");
@@ -308,6 +363,31 @@ impl Pass2 {
                         return self.parse_part_command(working, c);
                     }
                 };
+            }
+            "o" | "o+" | "o-" => {
+                match c {
+                    '0'..'9' => {
+                        // value
+                        if working.state > 2 {
+                            panic!("Octave: unexpected {c}");
+                        }
+
+                        working.jump(2);
+
+                        working.eat(c);
+                    }
+                    _ => {
+                        // other command
+                        working.push();
+
+                        Self::push_part_command::<Octave>(working);
+
+                        working.clear();
+
+                        // retry
+                        return self.parse_part_command(working, c);
+                    }
+                }
             }
             "_" | "__" => {
                 match c {
@@ -455,6 +535,126 @@ impl Pass2 {
                     }
                 }
             }
+            "E" => {
+                match c {
+                    '0'..'9' => {
+                        if working.state == 2 {
+                            // sign is not specified
+                            working.next();
+                        }
+
+                        working.eat(c);
+                    }
+                    ',' => {
+                        working.push();
+                        working.next();
+                    }
+                    '+' | '-' => {
+                        working.eat(c);
+                        working.push();
+                        working.next();
+                    }
+                    _ => {
+                        // other command
+                        working.push();
+
+                        Self::push_part_command::<SsgPcmSoftwareEnvelope>(working);
+
+                        // retry
+                        return self.parse_part_command(working, c);
+                    }
+                }
+            }
+            "v" | "V" | "v+" | "v-" | "v)" | "v(" => {
+                match c {
+                    '0'..'9' => {
+                        working.eat(c);
+                        working.jump(2);
+                    }
+                    _ => {
+                        // other command
+                        working.push();
+
+                        Self::push_part_command::<Volume>(working);
+
+                        // retry
+                        return self.parse_part_command(working, c);
+                    }
+                }
+            }
+            "Q" => {
+                match c {
+                    '%' => {
+                        working.eat(c);
+                        working.push();
+                        working.jump(2);
+                    }
+                    '0'..'9' => {
+                        working.eat(c);
+                        working.jump(3);
+                    }
+                    _ => {
+                        // other command
+                        working.push();
+
+                        Self::push_part_command::<Quantize1>(working);
+
+                        // retry
+                        return self.parse_part_command(working, c);
+                    }
+                }
+            }
+            "q" => {
+                match c {
+                    '-' => {
+                        if !(working.state == 1 || working.state == 3) {
+                            panic!("q: unexpected -");
+                        }
+
+                        working.eat(c);
+                        working.push();
+                        working.next();
+                    }
+                    'l' => {
+                        if !(working.state == 0 || working.state == 4 || working.state == 7) {
+                            panic!("q: unexpected l");
+                        }
+
+                        working.eat(c);
+                        working.push();
+                        working.next();
+                    }
+                    '0'..'9' => {
+                        working.eat(c);
+                    }
+                    '.' => {
+                        // dots, optional
+                        if working.state == 2 || working.state == 8 {
+                            working.push();
+                        }
+
+                        working.eat(c);
+                        match working.state {
+                            2 => working.jump(4),
+                            8 => working.jump(10),
+                            _ => panic!("q: unexpected dot"),
+                        };
+                    }
+                    ',' => {
+                        working.push();
+                        working.next();
+                    }
+                    _ => {
+                        // other command
+                        working.push();
+
+                        Self::push_part_command::<Quantize2>(working);
+
+                        // retry
+                        return self.parse_part_command(working, c);
+                    }
+                }
+            }
             _ => {
                 //
             }
@@ -467,20 +667,18 @@ impl Pass2 {
     where
         T: TryFrom<PartTokenStack, Error = Pass2Error> + PartCommandStruct,
     {
-        println!("==> {}: {:?}", get_type_name::<T>(), working.tokens);
         let command = match T::try_from(working.tokens.clone()) {
             Ok(v) => v,
-            Err(e) => panic!("{}: {}", get_type_name::<T>(), e),
+            Err(e) => panic!("{}: {} // {:?}", get_type_name::<T>(), e, working.tokens),
         };
 
-        println!("end: {}: {:?}", get_type_name::<T>(), command);
+        println!("==> {}: {:?}", get_type_name::<T>(), command);
 
         let w = WrappedPartCommand::new(
             working.tokens.first().unwrap().get_code(),
             command.to_variant(),
         );
 
-        // println!("end: {:?}", working.tokens);
         working.commands.push(w);
 
         working.clear();
