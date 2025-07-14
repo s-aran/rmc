@@ -692,7 +692,7 @@ impl Pass2 {
 #[cfg(test)]
 mod tests {
     use crate::{
-        models::{NegativePositive, NegativePositiveEqual, NoteCommand, PartSymbol},
+        models::{DivisorClock, NegativePositive, NegativePositiveEqual, NoteCommand, PartSymbol},
         pass1::Pass1,
     };
 
@@ -722,7 +722,7 @@ mod tests {
             command: "c".to_string(),
             natural: false,
             semitone: Some(NegativePositive::Positive),
-            length: Some(4),
+            length: Some(DivisorClock::Divisor(4)),
             dots: 0,
         };
         let actual = g_commands.get(0).unwrap();
@@ -740,7 +740,7 @@ mod tests {
             command: "d".to_string(),
             natural: false,
             semitone: Some(NegativePositive::Negative),
-            length: Some(12),
+            length: Some(DivisorClock::Divisor(12)),
             dots: 0,
         };
         let actual = g_commands.get(1).unwrap();
@@ -758,7 +758,7 @@ mod tests {
             command: "e".to_string(),
             natural: false,
             semitone: None,
-            length: Some(8),
+            length: Some(DivisorClock::Clock(8)),
             dots: 0,
         };
         let actual = g_commands.get(2).unwrap();
@@ -830,7 +830,7 @@ mod tests {
             command: "b".to_string(),
             natural: false,
             semitone: None,
-            length: Some(4),
+            length: Some(DivisorClock::Clock(4)),
             dots: 4,
         };
         let actual = g_commands.get(6).unwrap();

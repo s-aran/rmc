@@ -5,18 +5,15 @@ use crate::{
         commands_envelope::SsgPcmSoftwareEnvelope,
         commands_loop::{LocalLoopBegin, LocalLoopEnd, LocalLoopFinalBreak},
         commands_mml::{
-            self, DefaultLength, MasterTranspose, Note, NoteR, NoteX, Octave, OctaveDown,
-            OctaveReverse, OctaveUp, PartTransposeBegin, PartTransposeEnd, PortamentoBegin,
-            ProcessLastLengthAdd, ProcessLastLengthMultiply, ProcessLastLengthSubtract,
-            ProcessLastLengthUpdate, Quantize1, Quantize2, Slur, TemporaryTranspose, Tie,
+            DefaultLength, MasterTranspose, Note, NoteR, NoteX, Octave, OctaveDown, OctaveReverse,
+            OctaveUp, PartTransposeBegin, PartTransposeEnd, PortamentoBegin, ProcessLastLengthAdd,
+            ProcessLastLengthMultiply, ProcessLastLengthSubtract, ProcessLastLengthUpdate,
+            Quantize1, Quantize2, Slur, TemporaryTranspose, Tie,
         },
         commands_volume::Volume,
     },
-    errors::Pass2Error,
     meta_models::{Code, MetaData, Token, TokenStackTrait, TokenTrait},
-    models::{
-        DivisorClock, NegativePositive, NegativePositiveEqual, NoteCommand, NoteOctaveCommand,
-    },
+    models::NegativePositive,
     utils::get_type_name,
 };
 
@@ -40,6 +37,44 @@ macro_rules! try_from_get_value {
 }
 
 macro_rules! try_from_get_some_value {
+    ($expr:expr, $field:ident) => {
+        match $expr {
+            Ok(v) => v,
+            Err(e) => panic!(
+                "TryFrom for {} ({}): {}",
+                stringify!(Self),
+                stringify!($field),
+                e
+            ),
+        }
+    };
+}
+
+macro_rules! try_from_get_vec {
+    ($expr:expr, $field:ident) => {
+        match $expr {
+            Ok(v) => {
+                if v.len() > 0 {
+                    v
+                } else {
+                    panic!(
+                        "TryFrom for {} ({}) is empty",
+                        stringify!(Self),
+                        stringify!($field)
+                    );
+                }
+            }
+            Err(e) => panic!(
+                "TryFrom for {} ({}): {}",
+                stringify!(Self),
+                stringify!($field),
+                e
+            ),
+        }
+    };
+}
+
+macro_rules! try_from_get_some_vec {
     ($expr:expr, $field:ident) => {
         match $expr {
             Ok(v) => v,

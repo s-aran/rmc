@@ -40,3 +40,7 @@ pub fn get_type_name<T>() -> &'static str {
     let full = std::any::type_name::<T>();
     full.rsplit("::").next().unwrap()
 }
+
+pub fn some_vec<T>(vec: Vec<T>) -> Option<Vec<T>> {
+    if vec.is_empty() { None } else { Some(vec) }
+}

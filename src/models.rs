@@ -1,13 +1,11 @@
-use std::{collections::HashMap, ops::Neg, str::FromStr};
+use std::str::FromStr;
 
 use strum::VariantNames;
 
 use crate::{
-    meta_models::{
-        Code, FileName, MetaData, Pass1Result, Token, TokenStack, TokenStackTrait, TokenTrait,
-        VariantValue,
-    },
-    part_command::WrappedPartCommand,
+    errors::Pass2Error,
+    meta_models::{Code, FileName, Token, TokenStack, TokenStackTrait, TokenTrait, VariantValue},
+    part_command::{PartToken, WrappedPartCommand},
     utils::is_sep,
 };
 
@@ -88,6 +86,22 @@ pub enum RelativeAbsolute8 {
     Absolute(u8),
 }
 
+impl From<&str> for RelativeAbsolute8 {
+    fn from(value: &str) -> Self {
+        if value.starts_with('+') || value.starts_with('-') {
+            // NOTE: allow +128
+            // #Volumedown	FR+16,P+128,S+32 ==> C0 FA 80
+            // #Volumedown	FR+16,P+127,S+32 ==> C0 FA 7F
+            // #Volumedown	FR+16,P128,S+32  ==> C0 FB 80
+            let value = value.parse::<i16>().unwrap();
+            RelativeAbsolute8::Relative(value)
+        } else {
+            let value = value.parse::<u8>().unwrap();
+            RelativeAbsolute8::Absolute(value)
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumString)]
 pub enum NegativePositive {
     #[strum(serialize = "-")]
@@ -106,26 +120,50 @@ pub enum NegativePositiveEqual {
     Equal,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, strum::EnumString)]
-pub enum DivisorClock {
-    #[strum(serialize = "")]
-    Divisor,
-    #[strum(serialize = "%")]
-    Clock,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DivisorClock<T> {
+    Divisor(T),
+    Clock(T),
 }
 
-impl From<&str> for RelativeAbsolute8 {
-    fn from(value: &str) -> Self {
-        if value.starts_with('+') || value.starts_with('-') {
-            // NOTE: allow +128
-            // #Volumedown	FR+16,P+128,S+32 ==> C0 FA 80
-            // #Volumedown	FR+16,P+127,S+32 ==> C0 FA 7F
-            // #Volumedown	FR+16,P128,S+32  ==> C0 FB 80
-            let value = value.parse::<i16>().unwrap();
-            RelativeAbsolute8::Relative(value)
-        } else {
-            let value = value.parse::<u8>().unwrap();
-            RelativeAbsolute8::Absolute(value)
+impl TryFrom<Vec<PartToken>> for DivisorClock<u8> {
+    type Error = Pass2Error;
+
+    fn try_from(value: Vec<PartToken>) -> Result<Self, Self::Error> {
+        if value.len() <= 0 {
+            panic!("stack has no items");
+        }
+
+        if value.len() > 2 {
+            panic!("too many items: {} items", value.len());
+        }
+
+        if value.len() == 1 {
+            match value[0].token().parse::<u8>() {
+                Ok(v) => return Ok(DivisorClock::Divisor(v)),
+                Err(e) => {
+                    panic!("{}", e);
+                }
+            }
+        }
+
+        if value[0].get_state() != value[1].get_state() {
+            panic!(
+                "contains another number: {}, {}",
+                value[0].get_state(),
+                value[1].get_state()
+            );
+        }
+
+        if value[0].token() != "%" {
+            panic!("unexpected token: {}", value[0].token());
+        }
+
+        match value[1].token().parse::<u8>() {
+            Ok(v) => Ok(DivisorClock::Clock(v)),
+            Err(e) => {
+                panic!("{}", e);
+            }
         }
     }
 }
