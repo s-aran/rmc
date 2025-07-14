@@ -3,7 +3,7 @@ use crate::{
     models::{
         DivisorClock, NegativePositive, NegativePositiveEqual, NoteCommand, NoteOctaveCommand,
     },
-    part_command::{PartCommand, PartCommandStruct, PartTokenStack, count_dots},
+    part_command::{count_dots, PartCommand, PartCommandStruct, PartTokenStack},
 };
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -563,5 +563,64 @@ impl TryFrom<PartTokenStack> for MasterTranspose {
             sign,
             value,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        meta_models::{Token, TokenStackTrait, TokenTrait},
+        models::{NegativePositive, NegativePositiveEqual, NoteCommand, PartSymbol},
+        part_command::{PartToken, PartTokenStack, State},
+        pass1::Pass1,
+        Code,
+    };
+
+    use super::*;
+
+    fn make_part_token(state: State, token: impl Into<String>) -> PartToken {
+        let mut t = PartToken::default();
+
+        t.set_state(state);
+        *t.chars_mut() = token.into();
+
+        t
+    }
+
+    #[test]
+    fn test_note_1() {
+        let mut tokens = PartTokenStack::default();
+        tokens.push(&make_part_token(0, "c"));
+
+        let expected = Note {
+            command: "c".to_string(),
+            natural: false,
+            semitone: None,
+            length: None,
+            dots: 0,
+        };
+
+        let actual = Note::try_from(tokens).unwrap();
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_note_2() {
+        let mut tokens = PartTokenStack::default();
+        tokens.push(&make_part_token(0, "d"));
+        tokens.push(&make_part_token(1, "+"));
+
+        let expected = Note {
+            command: "d".to_string(),
+            natural: false,
+            semitone: Some(NegativePositive::Positive),
+            length: None,
+            dots: 0,
+        };
+
+        let actual = Note::try_from(tokens).unwrap();
+
+        assert_eq!(expected, actual);
     }
 }
