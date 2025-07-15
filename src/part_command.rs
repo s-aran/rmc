@@ -13,7 +13,7 @@ use crate::{
         commands_volume::Volume,
     },
     meta_models::{Code, MetaData, Token, TokenStackTrait, TokenTrait},
-    models::NegativePositive,
+    models::{DivisorClock, NegativePositive},
     utils::get_type_name,
 };
 
@@ -331,6 +331,14 @@ pub(crate) fn count_dots(dots: Option<String>) -> u8 {
         dots.chars().filter(|&c| c == '.').count() as u8
     } else {
         0
+    }
+}
+
+pub(crate) fn make_some_length(length_vec: Vec<PartToken>) -> Option<DivisorClock<u8>> {
+    if length_vec.len() > 0 {
+        Some(DivisorClock::try_from(length_vec).unwrap())
+    } else {
+        None
     }
 }
 
