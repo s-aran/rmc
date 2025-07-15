@@ -60,8 +60,9 @@ impl PartCommandStruct for Note {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NoteX {
-    pub length: Option<u8>,
-    pub dots: Option<String>,
+    pub command: String,
+    pub length: Option<DivisorClock<u8>>,
+    pub dots: u8,
 }
 
 impl PartCommandStruct for NoteX {
@@ -70,9 +71,35 @@ impl PartCommandStruct for NoteX {
     }
 }
 
+impl TryFrom<PartTokenStack> for NoteX {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = try_from_get_value!(value.pop_and_cast(0), command);
+        let length_vec = value.pop_by_state_all(1);
+        let length = if length_vec.len() > 0 {
+            Some(DivisorClock::try_from(length_vec).unwrap())
+        } else {
+            None
+        };
+        let dots = if let Some(e) = try_from_get_some_value!(value.pop_and_cast::<String>(2), dots)
+        {
+            e.chars().filter(|&c| c == '.').count() as u8
+        } else {
+            0
+        };
+
+        Ok(NoteX {
+            command,
+            length,
+            dots,
+        })
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NoteR {
-    pub length: Option<u8>,
+    pub length: Option<DivisorClock<u8>>,
     pub dots: Option<String>,
 }
 
@@ -815,6 +842,30 @@ mod tests {
 
     #[test]
     fn test_note_all_1() {
+        let mut tokens = PartTokenStack::default();
+        tokens.ez_push(0, "a");
+        tokens.ez_push(2, "-");
+        tokens.ez_push(3, "%");
+        tokens.ez_push(3, "20");
+        tokens.ez_push(4, "...");
+
+        assert_eq!(5, tokens.len());
+
+        let expected = Note {
+            command: "a".to_string(),
+            natural: false,
+            semitone: Some(NegativePositive::Negative),
+            length: Some(DivisorClock::Clock(20)),
+            dots: 3,
+        };
+
+        let actual = Note::try_from(tokens).unwrap();
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_note_x_length_1() {
         let mut tokens = PartTokenStack::default();
         tokens.ez_push(0, "a");
         tokens.ez_push(2, "-");
