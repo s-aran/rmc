@@ -14,7 +14,7 @@ use crate::{
     meta_models::{Code, Command, Pass1Result, Pass2Result, Pass2Working, TokenTrait},
     models::PartSymbol,
     part_command::{PartCommand, PartCommandStruct, PartTokenStack, WrappedPartCommand},
-    utils::{ParseUtil, get_type_name, is_n, is_sep},
+    utils::{get_type_name, is_n, is_sep, ParseUtil},
 };
 
 #[derive(Debug, Clone)]
@@ -334,6 +334,14 @@ impl Pass2 {
                         working.eat(c);
                         working.jump(2);
                         working.push();
+                    }
+                    '%' => {
+                        if working.state > 4 {
+                            panic!("Note: unexpected {c}");
+                        }
+
+                        working.eat(c);
+                        working.jump(3);
                     }
                     '0'..'9' => {
                         // length, optional
@@ -758,7 +766,7 @@ mod tests {
             command: "e".to_string(),
             natural: false,
             semitone: None,
-            length: Some(DivisorClock::Clock(8)),
+            length: Some(DivisorClock::Divisor(8)),
             dots: 0,
         };
         let actual = g_commands.get(2).unwrap();
@@ -830,7 +838,7 @@ mod tests {
             command: "b".to_string(),
             natural: false,
             semitone: None,
-            length: Some(DivisorClock::Clock(4)),
+            length: Some(DivisorClock::Divisor(4)),
             dots: 4,
         };
         let actual = g_commands.get(6).unwrap();
