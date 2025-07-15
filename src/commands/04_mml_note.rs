@@ -108,16 +108,62 @@ impl TryFrom<PartTokenStack> for NoteR {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PortamentoBegin {
+    pub command: String,
     pub pitch1: Option<NoteOctaveCommand>,
     pub pitch2: Option<NoteOctaveCommand>,
     pub length1: Option<u8>,
-    pub dots: Option<String>,
+    pub dots: u8,
     pub length2: Option<u8>,
 }
 
 impl PartCommandStruct for PortamentoBegin {
     fn to_variant(self) -> PartCommand {
-        PartCommand::Portamento(self)
+        PartCommand::PortamentoBegin(self)
+    }
+}
+
+impl TryFrom<PartTokenStack> for PortamentoBegin {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = try_from_get_value!(value.pop_and_cast::<String>(0), command);
+        let pitch1 = try_from_get_some_value!(value.pop_and_cast::<NoteOctaveCommand>(1), pitch1);
+        let pitch2 = try_from_get_some_value!(value.pop_and_cast::<NoteOctaveCommand>(2), pitch2);
+        let length1 = try_from_get_some_value!(value.pop_and_cast::<u8>(3), length1);
+        let dots = count_dots(try_from_get_some_value!(
+            value.pop_and_cast::<String>(4),
+            dots
+        ));
+        let length2 = try_from_get_some_value!(value.pop_and_cast::<u8>(5), length2);
+
+        Ok(PortamentoBegin {
+            command,
+            pitch1,
+            pitch2,
+            length1,
+            dots,
+            length2,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PortamentoEnd {
+    pub command: String,
+}
+
+impl PartCommandStruct for PortamentoEnd {
+    fn to_variant(self) -> PartCommand {
+        PartCommand::PortamentoEnd(self)
+    }
+}
+
+impl TryFrom<PartTokenStack> for PortamentoEnd {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = try_from_get_value!(value.pop_and_cast::<String>(0), command);
+        Ok(PortamentoEnd { command })
     }
 }
 
@@ -214,6 +260,7 @@ impl TryFrom<PartTokenStack> for OctaveReverse {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DefaultLength {
+    pub command: String,
     pub value_type: Option<DivisorClock<u8>>,
     pub value: u8,
     pub dots: Option<String>,
@@ -227,6 +274,7 @@ impl PartCommandStruct for DefaultLength {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ProcessLastLengthUpdate {
+    pub command: String,
     pub value_type: Option<DivisorClock<u8>>,
     pub value: Option<u8>,
     pub dots: Option<String>,
@@ -240,6 +288,7 @@ impl PartCommandStruct for ProcessLastLengthUpdate {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ProcessLastLengthAdd {
+    pub command: String,
     pub value_type: Option<DivisorClock<u8>>,
     pub value: u8,
     pub dots: Option<String>,
@@ -253,6 +302,7 @@ impl PartCommandStruct for ProcessLastLengthAdd {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ProcessLastLengthSubtract {
+    pub command: String,
     pub value_type: Option<DivisorClock<u8>>,
     pub value: u8,
     pub dots: Option<String>,
@@ -266,6 +316,7 @@ impl PartCommandStruct for ProcessLastLengthSubtract {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ProcessLastLengthMultiply {
+    pub command: String,
     pub value: u8,
 }
 
@@ -277,6 +328,7 @@ impl PartCommandStruct for ProcessLastLengthMultiply {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Tie {
+    pub command: String,
     pub length: Option<u8>,
     pub dots: Option<String>,
 }
@@ -289,6 +341,7 @@ impl PartCommandStruct for Tie {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Slur {
+    pub command: String,
     pub length: Option<u8>,
     pub dots: Option<String>,
 }

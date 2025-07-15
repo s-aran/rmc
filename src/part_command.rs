@@ -6,9 +6,9 @@ use crate::{
         commands_loop::{LocalLoopBegin, LocalLoopEnd, LocalLoopFinalBreak},
         commands_mml::{
             DefaultLength, MasterTranspose, Note, NoteR, NoteX, Octave, OctaveDown, OctaveReverse,
-            OctaveUp, PartTransposeBegin, PartTransposeEnd, PortamentoBegin, ProcessLastLengthAdd,
-            ProcessLastLengthMultiply, ProcessLastLengthSubtract, ProcessLastLengthUpdate,
-            Quantize1, Quantize2, Slur, TemporaryTranspose, Tie,
+            OctaveUp, PartTransposeBegin, PartTransposeEnd, PortamentoBegin, PortamentoEnd,
+            ProcessLastLengthAdd, ProcessLastLengthMultiply, ProcessLastLengthSubtract,
+            ProcessLastLengthUpdate, Quantize1, Quantize2, Slur, TemporaryTranspose, Tie,
         },
         commands_volume::Volume,
     },
@@ -269,7 +269,8 @@ pub enum PartCommand {
     NoteX(NoteX),
     NoteR(NoteR),
 
-    Portamento(PortamentoBegin),
+    PortamentoBegin(PortamentoBegin),
+    PortamentoEnd(PortamentoEnd),
 
     Octave(Octave),
     OctaveUp(OctaveUp),
