@@ -3,7 +3,7 @@ use crate::{
     models::{
         DivisorClock, NegativePositive, NegativePositiveEqual, NoteCommand, NoteOctaveCommand,
     },
-    part_command::{PartCommand, PartCommandStruct, PartTokenStack, count_dots},
+    part_command::{count_dots, PartCommand, PartCommandStruct, PartTokenStack},
 };
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -645,129 +645,195 @@ mod tests {
 
     #[test]
     fn test_note_semitone_1() {
-        {
-            let mut tokens = PartTokenStack::default();
-            tokens.ez_push(0, "e");
-            tokens.ez_push(2, "+");
+        let mut tokens = PartTokenStack::default();
+        tokens.ez_push(0, "e");
+        tokens.ez_push(2, "+");
 
-            assert_eq!(2, tokens.len());
+        assert_eq!(2, tokens.len());
 
-            let expected = Note {
-                command: "e".to_string(),
-                natural: false,
-                semitone: Some(NegativePositive::Positive),
-                length: None,
-                dots: 0,
-            };
+        let expected = Note {
+            command: "e".to_string(),
+            natural: false,
+            semitone: Some(NegativePositive::Positive),
+            length: None,
+            dots: 0,
+        };
 
-            let actual = Note::try_from(tokens).unwrap();
+        let actual = Note::try_from(tokens).unwrap();
 
-            assert_eq!(expected, actual);
-        }
+        assert_eq!(expected, actual);
+    }
 
-        {
-            let mut tokens = PartTokenStack::default();
-            tokens.ez_push(0, "e");
-            tokens.ez_push(2, "-");
+    #[test]
+    fn test_note_semitone_2() {
+        let mut tokens = PartTokenStack::default();
+        tokens.ez_push(0, "e");
+        tokens.ez_push(2, "-");
 
-            assert_eq!(2, tokens.len());
+        assert_eq!(2, tokens.len());
 
-            let expected = Note {
-                command: "e".to_string(),
-                natural: false,
-                semitone: Some(NegativePositive::Negative),
-                length: None,
-                dots: 0,
-            };
+        let expected = Note {
+            command: "e".to_string(),
+            natural: false,
+            semitone: Some(NegativePositive::Negative),
+            length: None,
+            dots: 0,
+        };
 
-            let actual = Note::try_from(tokens).unwrap();
+        let actual = Note::try_from(tokens).unwrap();
 
-            assert_eq!(expected, actual);
-        }
+        assert_eq!(expected, actual);
     }
 
     #[test]
     fn test_note_length_1() {
-        {
-            let mut tokens = PartTokenStack::default();
-            tokens.ez_push(0, "f");
-            tokens.ez_push(3, "4");
+        let mut tokens = PartTokenStack::default();
+        tokens.ez_push(0, "f");
+        tokens.ez_push(3, "4");
 
-            assert_eq!(2, tokens.len());
+        assert_eq!(2, tokens.len());
 
-            let expected = Note {
-                command: "f".to_string(),
-                natural: false,
-                semitone: None,
-                length: Some(DivisorClock::Divisor(4)),
-                dots: 0,
-            };
+        let expected = Note {
+            command: "f".to_string(),
+            natural: false,
+            semitone: None,
+            length: Some(DivisorClock::Divisor(4)),
+            dots: 0,
+        };
 
-            let actual = Note::try_from(tokens).unwrap();
+        let actual = Note::try_from(tokens).unwrap();
 
-            assert_eq!(expected, actual);
-        }
+        assert_eq!(expected, actual);
+    }
 
-        {
-            let mut tokens = PartTokenStack::default();
-            tokens.ez_push(0, "f");
-            tokens.ez_push(3, "12");
+    #[test]
+    fn test_note_length_2() {
+        let mut tokens = PartTokenStack::default();
+        tokens.ez_push(0, "f");
+        tokens.ez_push(3, "12");
 
-            assert_eq!(2, tokens.len());
+        assert_eq!(2, tokens.len());
 
-            let expected = Note {
-                command: "f".to_string(),
-                natural: false,
-                semitone: None,
-                length: Some(DivisorClock::Divisor(12)),
-                dots: 0,
-            };
+        let expected = Note {
+            command: "f".to_string(),
+            natural: false,
+            semitone: None,
+            length: Some(DivisorClock::Divisor(12)),
+            dots: 0,
+        };
 
-            let actual = Note::try_from(tokens).unwrap();
+        let actual = Note::try_from(tokens).unwrap();
 
-            assert_eq!(expected, actual);
-        }
+        assert_eq!(expected, actual);
+    }
 
-        {
-            let mut tokens = PartTokenStack::default();
-            tokens.ez_push(0, "f");
-            tokens.ez_push(3, "%");
-            tokens.ez_push(3, "4");
+    #[test]
+    fn test_note_length_3() {
+        let mut tokens = PartTokenStack::default();
+        tokens.ez_push(0, "f");
+        tokens.ez_push(3, "%");
+        tokens.ez_push(3, "4");
 
-            assert_eq!(3, tokens.len());
+        assert_eq!(3, tokens.len());
 
-            let expected = Note {
-                command: "f".to_string(),
-                natural: false,
-                semitone: None,
-                length: Some(DivisorClock::Clock(4)),
-                dots: 0,
-            };
+        let expected = Note {
+            command: "f".to_string(),
+            natural: false,
+            semitone: None,
+            length: Some(DivisorClock::Clock(4)),
+            dots: 0,
+        };
 
-            let actual = Note::try_from(tokens).unwrap();
+        let actual = Note::try_from(tokens).unwrap();
 
-            assert_eq!(expected, actual);
-        }
+        assert_eq!(expected, actual);
+    }
 
-        {
-            let mut tokens = PartTokenStack::default();
-            tokens.ez_push(0, "f");
-            tokens.ez_push(3, "%");
-            tokens.ez_push(3, "12");
+    #[test]
+    fn test_note_length_4() {
+        let mut tokens = PartTokenStack::default();
+        tokens.ez_push(0, "f");
+        tokens.ez_push(3, "%");
+        tokens.ez_push(3, "12");
 
-            assert_eq!(3, tokens.len());
+        assert_eq!(3, tokens.len());
 
-            let expected = Note {
-                command: "f".to_string(),
-                natural: false,
-                semitone: None,
-                length: Some(DivisorClock::Clock(12)),
-                dots: 0,
-            };
+        let expected = Note {
+            command: "f".to_string(),
+            natural: false,
+            semitone: None,
+            length: Some(DivisorClock::Clock(12)),
+            dots: 0,
+        };
 
-            let actual = Note::try_from(tokens).unwrap();
+        let actual = Note::try_from(tokens).unwrap();
 
-            assert_eq!(expected, actual);
-        }
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_note_dots_1() {
+        let mut tokens = PartTokenStack::default();
+        tokens.ez_push(0, "g");
+        tokens.ez_push(4, ".");
+
+        assert_eq!(2, tokens.len());
+
+        let expected = Note {
+            command: "g".to_string(),
+            natural: false,
+            semitone: None,
+            length: None,
+            dots: 1,
+        };
+
+        let actual = Note::try_from(tokens).unwrap();
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_note_dots_2() {
+        let mut tokens = PartTokenStack::default();
+        tokens.ez_push(0, "g");
+        tokens.ez_push(4, "....");
+
+        assert_eq!(2, tokens.len());
+
+        let expected = Note {
+            command: "g".to_string(),
+            natural: false,
+            semitone: None,
+            length: None,
+            dots: 4,
+        };
+
+        let actual = Note::try_from(tokens).unwrap();
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_note_all_1() {
+        let mut tokens = PartTokenStack::default();
+        tokens.ez_push(0, "a");
+        tokens.ez_push(2, "-");
+        tokens.ez_push(3, "%");
+        tokens.ez_push(3, "20");
+        tokens.ez_push(4, "...");
+
+        assert_eq!(5, tokens.len());
+
+        let expected = Note {
+            command: "a".to_string(),
+            natural: false,
+            semitone: Some(NegativePositive::Negative),
+            length: Some(DivisorClock::Clock(20)),
+            dots: 3,
+        };
+
+        let actual = Note::try_from(tokens).unwrap();
+
+        assert_eq!(expected, actual);
     }
 }
