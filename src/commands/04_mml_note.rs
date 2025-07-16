@@ -3,7 +3,7 @@ use crate::{
     models::{
         DivisorClock, NegativePositive, NegativePositiveEqual, NoteCommand, NoteOctaveCommand,
     },
-    part_command::{count_dots, make_some_length, PartCommand, PartCommandStruct, PartTokenStack},
+    part_command::{PartCommand, PartCommandStruct, PartTokenStack, count_dots, make_some_length},
 };
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -20,13 +20,9 @@ impl TryFrom<PartTokenStack> for Note {
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
         let command = try_from_get_value!(value.pop_and_cast(0), command);
-        let natural =
-            if let Some(v) = try_from_get_some_value!(value.pop_and_cast::<String>(1), natural) {
-                v == "="
-            } else {
-                false
-            };
-
+        let natural = try_from_get_some_value!(value.pop_and_cast::<String>(1), natural)
+            .unwrap_or_default()
+            == "=";
         let semitone =
             try_from_get_some_value!(value.pop_and_cast::<NegativePositive>(2), semitone);
         let length = make_some_length(value.pop_by_state_all(3));
@@ -109,8 +105,7 @@ impl TryFrom<PartTokenStack> for NoteR {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PortamentoBegin {
     pub command: String,
-    pub pitch1: Option<NoteOctaveCommand>,
-    pub pitch2: Option<NoteOctaveCommand>,
+    pub pitch: Vec<PartCommand>,
 }
 
 impl PartCommandStruct for PortamentoBegin {
@@ -124,14 +119,9 @@ impl TryFrom<PartTokenStack> for PortamentoBegin {
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
         let command = try_from_get_value!(value.pop_and_cast::<String>(0), command);
-        let pitch1 = try_from_get_some_value!(value.pop_and_cast::<NoteOctaveCommand>(1), pitch1);
-        let pitch2 = try_from_get_some_value!(value.pop_and_cast::<NoteOctaveCommand>(2), pitch2);
+        let pitch = try_from_get_vec!(value.pop_and_cast::<Note>(1), pitch);
 
-        Ok(PortamentoBegin {
-            command,
-            pitch1,
-            pitch2,
-        })
+        Ok(PortamentoBegin { command, pitch })
     }
 }
 
@@ -309,17 +299,13 @@ impl TryFrom<PartTokenStack> for ProcessLastLengthUpdate {
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
         let command = try_from_get_value!(value.pop_and_cast(0), command);
         let natural =
-            if let Some(v) = try_from_get_some_value!(value.pop_and_cast::<String>(1), natural) {
-                v == "="
-            } else {
-                false
-            };
+            try_from_get_some_value!(value.pop_and_cast::<String>(1), natural).map(|v| v == "=");
         let length = make_some_length(value.pop_by_state_all(2));
         let dots = count_dots(try_from_get_some_value!(value.pop_and_cast(3), dots));
 
         Ok(ProcessLastLengthUpdate {
             command,
-            natutal,
+            natural,
             length,
             dots,
         })
@@ -353,7 +339,7 @@ impl TryFrom<PartTokenStack> for ProcessLastLengthAddSub {
         let length = make_some_length(value.pop_by_state_all(3));
         let dots = count_dots(try_from_get_some_value!(value.pop_and_cast(4), dots));
 
-        Ok(ProcessLastLengthUpdate {
+        Ok(ProcessLastLengthAddSub {
             command,
             length,
             dots,
@@ -452,12 +438,7 @@ impl Quantize2 {
         let value1_dots = 0;
 
         let has_range =
-            if let Some(v) = try_from_get_some_value!(value.pop_and_cast::<String>(2), range) {
-                Some(v == "-")
-            } else {
-                None
-            };
-
+            try_from_get_some_value!(value.pop_and_cast::<String>(2), range).map(|v| v == "-");
         let value2 = try_from_get_some_value!(value.pop_and_cast(3), value2);
         if value2.is_some()
             && let Some(v) = has_range
@@ -484,12 +465,7 @@ impl Quantize2 {
         let command = try_from_get_value!(value.pop_and_cast(0), command);
 
         let has_value1_l =
-            if let Some(v) = try_from_get_some_value!(value.pop_and_cast::<String>(1), value1_l) {
-                Some(v != "l")
-            } else {
-                None
-            };
-
+            try_from_get_some_value!(value.pop_and_cast::<String>(1), value1_l).map(|v| v != "l");
         let value1 = try_from_get_some_value!(value.pop_and_cast(2), value1);
         if value1.is_some()
             && let Some(v) = has_value1_l
@@ -500,19 +476,9 @@ impl Quantize2 {
         let value1_dots = count_dots(try_from_get_some_value!(value.pop_and_cast(3), value1_dots));
 
         let has_range =
-            if let Some(v) = try_from_get_some_value!(value.pop_and_cast::<String>(4), range) {
-                Some(v == "-")
-            } else {
-                None
-            };
-
+            try_from_get_some_value!(value.pop_and_cast::<String>(4), range).map(|v| v == "l");
         let has_value2_l =
-            if let Some(v) = try_from_get_some_value!(value.pop_and_cast::<String>(5), value1_l) {
-                Some(v != "l")
-            } else {
-                None
-            };
-
+            try_from_get_some_value!(value.pop_and_cast::<String>(5), value1_l).map(|v| v != "l");
         let value2 = try_from_get_some_value!(value.pop_and_cast(6), value2);
         if value2.is_some() {
             if let Some(v) = has_range
@@ -529,12 +495,7 @@ impl Quantize2 {
         }
 
         let has_value3_l =
-            if let Some(v) = try_from_get_some_value!(value.pop_and_cast::<String>(7), value1_l) {
-                Some(v != "l")
-            } else {
-                None
-            };
-
+            try_from_get_some_value!(value.pop_and_cast::<String>(7), value1_l).map(|v| v != "l");
         let value3 = try_from_get_some_value!(value.pop_and_cast(8), value3);
         if value1.is_some()
             && let Some(v) = has_value3_l
@@ -1250,6 +1211,26 @@ mod tests {
             command: "r".to_string(),
             length: Some(DivisorClock::Clock(192)),
             dots: 3,
+        };
+
+        let actual = NoteR::try_from(tokens).unwrap();
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_portamento_begin_note_1() {
+        let mut tokens = PartTokenStack::default();
+        tokens.ez_push(0, "{");
+        tokens.ez_push(1, "c");
+        tokens.ez_push(1, "d");
+
+        assert_eq!(3, tokens.len());
+
+        let expected = PortamentoBegin {
+            command: "{".to_string(),
+            pitch1: "c".to_string(),
+            pitch2: "d".to_string(),
         };
 
         let actual = NoteR::try_from(tokens).unwrap();

@@ -7,8 +7,8 @@ use crate::{
         commands_mml::{
             DefaultLength, MasterTranspose, Note, NoteR, NoteX, Octave, OctaveDown, OctaveReverse,
             OctaveUp, PartTransposeBegin, PartTransposeEnd, PortamentoBegin, PortamentoEnd,
-            ProcessLastLengthAdd, ProcessLastLengthMultiply, ProcessLastLengthSubtract,
-            ProcessLastLengthUpdate, Quantize1, Quantize2, Slur, TemporaryTranspose, Tie,
+            ProcessLastLengthAddSub, ProcessLastLengthMultiply, ProcessLastLengthUpdate, Quantize1,
+            Quantize2, Slur, TemporaryTranspose, Tie,
         },
         commands_volume::Volume,
     },
@@ -282,8 +282,8 @@ pub enum PartCommand {
     DefaultLength(DefaultLength),
 
     ProcessLastLengthUpdate(ProcessLastLengthUpdate),
-    ProcessLastLengthAdd(ProcessLastLengthAdd),
-    ProcessLastLengthSubtract(ProcessLastLengthSubtract),
+    ProcessLastLengthAdd(ProcessLastLengthAddSub),
+    ProcessLastLengthSubtract(ProcessLastLengthAddSub),
     ProcessLastLengthMultiply(ProcessLastLengthMultiply),
 
     Tie(Tie),

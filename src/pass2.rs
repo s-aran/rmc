@@ -14,7 +14,7 @@ use crate::{
     meta_models::{Code, Command, Pass1Result, Pass2Result, Pass2Working, TokenTrait},
     models::PartSymbol,
     part_command::{PartCommand, PartCommandStruct, PartTokenStack, WrappedPartCommand},
-    utils::{get_type_name, is_n, is_sep, ParseUtil},
+    utils::{ParseUtil, get_type_name, is_n, is_sep},
 };
 
 #[derive(Debug, Clone)]
