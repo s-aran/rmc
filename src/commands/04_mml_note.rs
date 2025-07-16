@@ -3,7 +3,7 @@ use crate::{
     models::{
         DivisorClock, NegativePositive, NegativePositiveEqual, NoteCommand, NoteOctaveCommand,
     },
-    part_command::{PartCommand, PartCommandStruct, PartTokenStack, count_dots, make_some_length},
+    part_command::{count_dots, make_some_length, PartCommand, PartCommandStruct, PartTokenStack},
 };
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -111,9 +111,6 @@ pub struct PortamentoBegin {
     pub command: String,
     pub pitch1: Option<NoteOctaveCommand>,
     pub pitch2: Option<NoteOctaveCommand>,
-    pub length1: Option<u8>,
-    pub dots: u8,
-    pub length2: Option<u8>,
 }
 
 impl PartCommandStruct for PortamentoBegin {
@@ -129,20 +126,11 @@ impl TryFrom<PartTokenStack> for PortamentoBegin {
         let command = try_from_get_value!(value.pop_and_cast::<String>(0), command);
         let pitch1 = try_from_get_some_value!(value.pop_and_cast::<NoteOctaveCommand>(1), pitch1);
         let pitch2 = try_from_get_some_value!(value.pop_and_cast::<NoteOctaveCommand>(2), pitch2);
-        let length1 = try_from_get_some_value!(value.pop_and_cast::<u8>(3), length1);
-        let dots = count_dots(try_from_get_some_value!(
-            value.pop_and_cast::<String>(4),
-            dots
-        ));
-        let length2 = try_from_get_some_value!(value.pop_and_cast::<u8>(5), length2);
 
         Ok(PortamentoBegin {
             command,
             pitch1,
             pitch2,
-            length1,
-            dots,
-            length2,
         })
     }
 }
@@ -150,6 +138,9 @@ impl TryFrom<PartTokenStack> for PortamentoBegin {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PortamentoEnd {
     pub command: String,
+    pub length1: Option<u8>,
+    pub dots: u8,
+    pub length2: Option<u8>,
 }
 
 impl PartCommandStruct for PortamentoEnd {
@@ -163,7 +154,19 @@ impl TryFrom<PartTokenStack> for PortamentoEnd {
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
         let command = try_from_get_value!(value.pop_and_cast::<String>(0), command);
-        Ok(PortamentoEnd { command })
+        let length1 = try_from_get_some_value!(value.pop_and_cast::<u8>(1), length1);
+        let dots = count_dots(try_from_get_some_value!(
+            value.pop_and_cast::<String>(2),
+            dots
+        ));
+        let length2 = try_from_get_some_value!(value.pop_and_cast::<u8>(3), length2);
+
+        Ok(PortamentoEnd {
+            command,
+            length1,
+            dots,
+            length2,
+        })
     }
 }
 
@@ -261,9 +264,8 @@ impl TryFrom<PartTokenStack> for OctaveReverse {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DefaultLength {
     pub command: String,
-    pub value_type: Option<DivisorClock<u8>>,
-    pub value: u8,
-    pub dots: Option<String>,
+    pub length: Option<DivisorClock<u8>>,
+    pub dots: u8,
 }
 
 impl PartCommandStruct for DefaultLength {
@@ -272,12 +274,27 @@ impl PartCommandStruct for DefaultLength {
     }
 }
 
+impl TryFrom<PartTokenStack> for DefaultLength {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = try_from_get_value!(value.pop_and_cast(0), command);
+        let length = make_some_length(value.pop_by_state_all(1));
+        let dots = count_dots(try_from_get_some_value!(value.pop_and_cast(2), dots));
+
+        Ok(DefaultLength {
+            command,
+            length,
+            dots,
+        })
+    }
+}
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ProcessLastLengthUpdate {
     pub command: String,
-    pub value_type: Option<DivisorClock<u8>>,
-    pub value: Option<u8>,
-    pub dots: Option<String>,
+    pub natural: Option<bool>,
+    pub length: Option<DivisorClock<u8>>,
+    pub dots: u8,
 }
 
 impl PartCommandStruct for ProcessLastLengthUpdate {
@@ -286,31 +303,61 @@ impl PartCommandStruct for ProcessLastLengthUpdate {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ProcessLastLengthAdd {
-    pub command: String,
-    pub value_type: Option<DivisorClock<u8>>,
-    pub value: u8,
-    pub dots: Option<String>,
-}
+impl TryFrom<PartTokenStack> for ProcessLastLengthUpdate {
+    type Error = Pass2Error;
 
-impl PartCommandStruct for ProcessLastLengthAdd {
-    fn to_variant(self) -> PartCommand {
-        PartCommand::ProcessLastLengthAdd(self)
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = try_from_get_value!(value.pop_and_cast(0), command);
+        let natural =
+            if let Some(v) = try_from_get_some_value!(value.pop_and_cast::<String>(1), natural) {
+                v == "="
+            } else {
+                false
+            };
+        let length = make_some_length(value.pop_by_state_all(2));
+        let dots = count_dots(try_from_get_some_value!(value.pop_and_cast(3), dots));
+
+        Ok(ProcessLastLengthUpdate {
+            command,
+            natutal,
+            length,
+            dots,
+        })
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ProcessLastLengthSubtract {
+pub struct ProcessLastLengthAddSub {
     pub command: String,
-    pub value_type: Option<DivisorClock<u8>>,
-    pub value: u8,
-    pub dots: Option<String>,
+    pub length: Option<DivisorClock<u8>>,
+    pub dots: u8,
 }
 
-impl PartCommandStruct for ProcessLastLengthSubtract {
+impl PartCommandStruct for ProcessLastLengthAddSub {
     fn to_variant(self) -> PartCommand {
-        PartCommand::ProcessLastLengthSubtract(self)
+        match self.command.as_str() {
+            "l+" => PartCommand::ProcessLastLengthAdd(self),
+            "l-" => PartCommand::ProcessLastLengthSubtract(self),
+            _ => {
+                panic!("unexpected command: {}", self.command);
+            }
+        }
+    }
+}
+
+impl TryFrom<PartTokenStack> for ProcessLastLengthAddSub {
+    type Error = Pass2Error;
+
+    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        let command = try_from_get_value!(value.pop_and_cast(0), command);
+        let length = make_some_length(value.pop_by_state_all(3));
+        let dots = count_dots(try_from_get_some_value!(value.pop_and_cast(4), dots));
+
+        Ok(ProcessLastLengthUpdate {
+            command,
+            length,
+            dots,
+        })
     }
 }
 
