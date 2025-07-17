@@ -103,56 +103,41 @@ impl TryFrom<PartTokenStack> for NoteR {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct PortamentoBegin {
-    pub command: String,
+pub struct Portamento {
+    pub begin_command: String,
     pub pitch: Vec<PartCommand>,
-}
-
-impl PartCommandStruct for PortamentoBegin {
-    fn to_variant(self) -> PartCommand {
-        PartCommand::PortamentoBegin(self)
-    }
-}
-
-impl TryFrom<PartTokenStack> for PortamentoBegin {
-    type Error = Pass2Error;
-
-    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = try_from_get_value!(value.pop_and_cast::<String>(0), command);
-        let pitch = try_from_get_vec!(value.pop_and_cast::<Note>(1), pitch);
-
-        Ok(PortamentoBegin { command, pitch })
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct PortamentoEnd {
-    pub command: String,
+    pub end_command: String,
     pub length1: Option<u8>,
     pub dots: u8,
     pub length2: Option<u8>,
 }
 
-impl PartCommandStruct for PortamentoEnd {
+impl PartCommandStruct for Portamento {
     fn to_variant(self) -> PartCommand {
-        PartCommand::PortamentoEnd(self)
+        PartCommand::Portamento(self)
     }
 }
 
-impl TryFrom<PartTokenStack> for PortamentoEnd {
+impl TryFrom<PartTokenStack> for Portamento {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = try_from_get_value!(value.pop_and_cast::<String>(0), command);
-        let length1 = try_from_get_some_value!(value.pop_and_cast::<u8>(1), length1);
+        let begin_command = try_from_get_value!(value.pop_and_cast::<String>(0), command);
+        // let pitch = try_from_get_vec!(value.pop_and_cast::<Note>(1), pitch);
+        let pitch = vec![];
+
+        let end_command = try_from_get_value!(value.pop_and_cast::<String>(2), command);
+        let length1 = try_from_get_some_value!(value.pop_and_cast::<u8>(3), length1);
         let dots = count_dots(try_from_get_some_value!(
-            value.pop_and_cast::<String>(2),
+            value.pop_and_cast::<String>(3),
             dots
         ));
-        let length2 = try_from_get_some_value!(value.pop_and_cast::<u8>(3), length2);
+        let length2 = try_from_get_some_value!(value.pop_and_cast::<u8>(4), length2);
 
-        Ok(PortamentoEnd {
-            command,
+        Ok(Portamento {
+            begin_command,
+            pitch,
+            end_command,
             length1,
             dots,
             length2,
@@ -1223,17 +1208,36 @@ mod tests {
         let mut tokens = PartTokenStack::default();
         tokens.ez_push(0, "{");
         tokens.ez_push(1, "c");
-        tokens.ez_push(1, "d");
+        tokens.ez_push(2, "d");
+        tokens.ez_push(3, "}");
 
-        assert_eq!(3, tokens.len());
+        assert_eq!(4, tokens.len());
 
-        let expected = PortamentoBegin {
-            command: "{".to_string(),
-            pitch1: "c".to_string(),
-            pitch2: "d".to_string(),
+        let expected = Portamento {
+            begin_command: "{".to_string(),
+            pitch: vec![
+                PartCommand::Note(Note {
+                    command: "c".to_string(),
+                    natural: false,
+                    semitone: None,
+                    length: None,
+                    dots: 0,
+                }),
+                PartCommand::Note(Note {
+                    command: "d".to_string(),
+                    natural: false,
+                    semitone: None,
+                    length: None,
+                    dots: 0,
+                }),
+            ],
+            end_command: "}".to_string(),
+            length1: None,
+            dots: 0,
+            length2: None,
         };
 
-        let actual = NoteR::try_from(tokens).unwrap();
+        let actual = Portamento::try_from(tokens).unwrap();
 
         assert_eq!(expected, actual);
     }

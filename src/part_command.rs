@@ -6,9 +6,9 @@ use crate::{
         commands_loop::{LocalLoopBegin, LocalLoopEnd, LocalLoopFinalBreak},
         commands_mml::{
             DefaultLength, MasterTranspose, Note, NoteR, NoteX, Octave, OctaveDown, OctaveReverse,
-            OctaveUp, PartTransposeBegin, PartTransposeEnd, PortamentoBegin, PortamentoEnd,
-            ProcessLastLengthAddSub, ProcessLastLengthMultiply, ProcessLastLengthUpdate, Quantize1,
-            Quantize2, Slur, TemporaryTranspose, Tie,
+            OctaveUp, PartTransposeBegin, PartTransposeEnd, Portamento, ProcessLastLengthAddSub,
+            ProcessLastLengthMultiply, ProcessLastLengthUpdate, Quantize1, Quantize2, Slur,
+            TemporaryTranspose, Tie,
         },
         commands_volume::Volume,
     },
@@ -50,29 +50,29 @@ macro_rules! try_from_get_some_value {
     };
 }
 
-macro_rules! try_from_get_vec {
-    ($expr:expr, $field:ident) => {
-        match $expr {
-            Ok(v) => {
-                if v.len() > 0 {
-                    v
-                } else {
-                    panic!(
-                        "TryFrom for {} ({}) is empty",
-                        stringify!(Self),
-                        stringify!($field)
-                    );
-                }
-            }
-            Err(e) => panic!(
-                "TryFrom for {} ({}): {}",
-                stringify!(Self),
-                stringify!($field),
-                e
-            ),
-        }
-    };
-}
+// macro_rules! try_from_get_vec {
+//     ($expr:expr, $field:ident) => {
+//         match $expr {
+//             Ok(v) => {
+//                 if v.len() > 0 {
+//                     v
+//                 } else {
+//                     panic!(
+//                         "TryFrom for {} ({}) is empty",
+//                         stringify!(Self),
+//                         stringify!($field)
+//                     );
+//                 }
+//             }
+//             Err(e) => panic!(
+//                 "TryFrom for {} ({}): {}",
+//                 stringify!(Self),
+//                 stringify!($field),
+//                 e
+//             ),
+//         }
+//     };
+// }
 
 macro_rules! try_from_get_some_vec {
     ($expr:expr, $field:ident) => {
@@ -269,8 +269,7 @@ pub enum PartCommand {
     NoteX(NoteX),
     NoteR(NoteR),
 
-    PortamentoBegin(PortamentoBegin),
-    PortamentoEnd(PortamentoEnd),
+    Portamento(Portamento),
 
     Octave(Octave),
     OctaveUp(OctaveUp),
