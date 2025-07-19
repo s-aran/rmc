@@ -1,3 +1,4 @@
+use crate::meta_models::{TokenStackTrait, TokenTrait};
 use crate::{
     errors::Pass2Error,
     models::{
@@ -5,7 +6,6 @@ use crate::{
     },
     part_command::{PartCommand, PartCommandStruct, PartTokenStack, count_dots, make_some_length},
 };
-use crate::meta_models::{TokenStackTrait, TokenTrait};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Note {
