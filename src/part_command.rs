@@ -3,7 +3,7 @@ use std::str::FromStr;
 use crate::{
     commands::{
         commands_envelope::SsgPcmSoftwareEnvelope,
-        commands_loop::{LocalLoopBegin, LocalLoopEnd, LocalLoopFinalBreak},
+        commands_loop::LocalLoop,
         commands_mml::{
             DefaultLength, MasterTranspose, Note, NoteR, NoteX, Octave, OctaveDown, OctaveReverse,
             OctaveUp, PartTransposeBegin, PartTransposeEnd, Portamento, ProcessLastLengthAddSub,
@@ -321,9 +321,7 @@ pub enum PartCommand {
     PartTransposeEnd(PartTransposeEnd),
     MasterTranspose(MasterTranspose),
 
-    LocalLoopBegin(LocalLoopBegin),
-    LocalLoopFinalBreak(LocalLoopFinalBreak),
-    LocalLoopEnd(LocalLoopEnd),
+    LocalLoop(LocalLoop),
 
     SsgPcmSoftwareEnvelope(SsgPcmSoftwareEnvelope),
 

@@ -3,10 +3,10 @@ use std::str::FromStr;
 use crate::{
     commands::{
         commands_envelope::SsgPcmSoftwareEnvelope,
-        commands_loop::{LocalLoopBegin, LocalLoopEnd, LocalLoopFinalBreak},
+        commands_loop::LocalLoop,
         commands_mml::{
-            MasterTranspose, Note, Octave, PartTransposeBegin, PartTransposeEnd, Quantize1,
-            Quantize2, TemporaryTranspose, Portamento,
+            MasterTranspose, Note, Octave, PartTransposeBegin, PartTransposeEnd, Portamento,
+            Quantize1, Quantize2, TemporaryTranspose,
         },
         commands_volume::Volume,
     },
@@ -531,52 +531,39 @@ impl Pass2 {
                 }
             }
             "[" => {
-                // start of loop: push current commands and begin nested section
+                // loop start: push outer commands, clear for inner
+                working.loop_nest += 1;
                 working.part_command_stack.push(working.commands.clone());
                 working.commands.clear();
 
-                Self::push_part_command::<LocalLoopBegin>(working);
-
-                // retry to parse nested commands
-                return self.parse_part_command(working, c);
+                working.push();
+                working.jump(1);
+                return Ok(PartCommand::Nop);
             }
             ":" => {
+                // loop break: mark break
+                if working.loop_nest > 0 {
+                    working.eat(c);
+                    working.push();
+                    working.jump(1);
+                    return Ok(PartCommand::Nop);
+                }
+                panic!("Unexpected ':' outside loop");
+            }
+            "]" => {
+                // loop end: finalize nested section
+                working.loop_nest -= 1;
                 working.push();
+                working.jump(1);
 
-                Self::push_part_command::<LocalLoopFinalBreak>(working);
-
-                // retry
+                let inner = working.commands.clone();
+                working.commands.clear();
+                if let Some(prev) = working.part_command_stack.pop() {
+                    working.commands = prev;
+                }
+                Self::push_part_command::<LocalLoop>(working);
                 return self.parse_part_command(working, c);
             }
-                "]" => {
-                    match c {
-                        '0'..'9' => {
-                            // loop count
-                            if working.state > 1 {
-                                panic!("Loop: unexpected {c}");
-                            }
-
-                            working.jump(1);
-                            working.eat(c);
-                        }
-                        _ => {
-                            // end of loop: finalize nested section
-                            working.push();
-
-                            let inner_commands = working.commands.clone();
-                            working.commands.clear();
-                            if let Some(prev_commands) = working.part_command_stack.pop() {
-                                working.commands = prev_commands;
-                                // TODO: attach inner_commands to loop structure
-                            }
-
-                            Self::push_part_command::<LocalLoopEnd>(working);
-
-                            // retry to continue parsing
-                            return self.parse_part_command(working, c);
-                        }
-                    }
-                }
             "E" => {
                 match c {
                     '0'..'9' => {
@@ -898,19 +885,6 @@ mod tests {
             }
         );
 
-        // [
-        let expected = LocalLoopBegin {
-            command: "[".to_string(),
-        };
-        let actual = g_commands.get(8).unwrap();
-        assert_eq!(
-            expected,
-            if let PartCommand::LocalLoopBegin(ref c) = *actual.data() {
-                c.clone()
-            } else {
-                panic!("unexpected command: {:?}", actual)
-            }
-        );
 
         // e
         let expected = Note {
@@ -946,20 +920,6 @@ mod tests {
             }
         );
 
-        // ]8
-        let expected = LocalLoopEnd {
-            command: "]".to_string(),
-            count: Some(8),
-        };
-        let actual = g_commands.get(11).unwrap();
-        assert_eq!(
-            expected,
-            if let PartCommand::LocalLoopEnd(ref c) = *actual.data() {
-                c.clone()
-            } else {
-                panic!("unexpected command: {:?}", actual)
-            }
-        );
 
         // _0
         let expected = TemporaryTranspose {
