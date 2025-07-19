@@ -5,6 +5,7 @@ use crate::{
     },
     part_command::{PartCommand, PartCommandStruct, PartTokenStack, count_dots, make_some_length},
 };
+use crate::meta_models::{TokenStackTrait, TokenTrait};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Note {
@@ -122,25 +123,32 @@ impl TryFrom<PartTokenStack> for Portamento {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        let begin_command = try_from_get_value!(value.pop_and_cast::<String>(0), command);
-        // let pitch = try_from_get_vec!(value.pop_and_cast::<Note>(1), pitch);
-        let pitch = vec![];
+        // collect all tokens placed into the stack
+        let tokens = value.stack().clone();
 
-        let end_command = try_from_get_value!(value.pop_and_cast::<String>(2), command);
-        let length1 = try_from_get_some_value!(value.pop_and_cast::<u8>(3), length1);
-        let dots = count_dots(try_from_get_some_value!(
-            value.pop_and_cast::<String>(3),
-            dots
-        ));
-        let length2 = try_from_get_some_value!(value.pop_and_cast::<u8>(4), length2);
+        // begin and end markers
+        let begin_command = tokens.first().unwrap().token();
+        let end_command = tokens.last().unwrap().token();
+
+        // extract inner pitch commands between begin and end
+        let mut pitch = Vec::new();
+        for tok in &tokens[1..tokens.len() - 1] {
+            // normalize state for individual note token
+            let mut pt = tok.clone();
+            pt.set_state(0);
+            let mut inner_stack = PartTokenStack::default();
+            inner_stack.stack_mut().push(pt);
+            let note = Note::try_from(inner_stack)?;
+            pitch.push(PartCommand::Note(note));
+        }
 
         Ok(Portamento {
             begin_command,
             pitch,
             end_command,
-            length1,
-            dots,
-            length2,
+            length1: None,
+            dots: 0,
+            length2: None,
         })
     }
 }

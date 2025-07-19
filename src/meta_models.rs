@@ -2,7 +2,7 @@ use crate::models::{
     Comment1, Comment2, ExtendNormalOption, FmToneDefine, Macro, OnOffOption, PartSymbol,
     ReverseNormalOption, Variable,
 };
-use crate::part_command::{PartToken, PartTokenStack, State, WrappedPartCommand};
+use crate::part_command::{PartToken, PartTokenStack, State, PartCommandStack, WrappedPartCommand};
 
 pub type FileName = String;
 pub type LineNumber = usize;
@@ -460,6 +460,8 @@ pub(crate) struct Pass2Working {
     pub code: Code,
     pub state: State,
     pub loop_nest: u8,
+    /// Stack of nested WrappedPartCommand sequences for portamento and loops.
+    pub part_command_stack: PartCommandStack,
     pub commands: Vec<WrappedPartCommand>,
 }
 

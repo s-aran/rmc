@@ -261,6 +261,31 @@ pub trait PartCommandStruct: std::fmt::Debug {
     fn to_variant(self) -> PartCommand;
 }
 
+#[derive(Default, Debug, Clone)]
+pub(crate) struct PartCommandStack {
+    stack: Vec<Vec<WrappedPartCommand>>,
+}
+
+impl PartCommandStack {
+    pub fn stack(&self) -> &Vec<Vec<WrappedPartCommand>> {
+        &self.stack
+    }
+
+    pub fn stack_mut(&mut self) -> &mut Vec<Vec<WrappedPartCommand>> {
+        &mut self.stack
+    }
+
+    /// Push a set of commands onto the stack (e.g., at a begin of portamento or loop).
+    pub fn push(&mut self, commands: Vec<WrappedPartCommand>) {
+        self.stack.push(commands);
+    }
+
+    /// Pop the most recently pushed set of commands, if any.
+    pub fn pop(&mut self) -> Option<Vec<WrappedPartCommand>> {
+        self.stack.pop()
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PartCommand {
     Nop,
