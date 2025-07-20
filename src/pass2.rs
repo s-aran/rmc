@@ -469,19 +469,10 @@ impl Pass2 {
                         working.eat(c);
                         working.push();
                     }
-                    'c' | 'd' | 'e' | 'f' | 'g' | 'a' | 'b' => {
-                        if working.state > 3 {
-                            panic!("Part Transpose: unexpected {c}");
-                        }
-
-                        working.jump(3);
-                        working.eat(c);
-                        working.push();
-                    }
                     _ => {
-                        // other command
                         working.push();
 
+                        // part cpmmand
                         Self::push_part_command::<PartTransposeBegin>(working);
 
                         // retry
@@ -724,7 +715,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore]
     fn test_1() {
         let mml = r#"G	c+4d-12e8f.g=a..b4...._-2[e__+1]8_0_{-eab}_M+120"#;
 
@@ -741,7 +731,7 @@ mod tests {
         assert_eq!(1, part_g_list.len());
 
         let g_commands = part_g_list.get(0).unwrap();
-        assert_eq!(16, g_commands.len());
+        assert_eq!(14, g_commands.len());
 
         // c+4
         let expected = Note {
@@ -885,7 +875,6 @@ mod tests {
             }
         );
 
-
         // e
         let expected = Note {
             command: "e".to_string(),
@@ -919,7 +908,6 @@ mod tests {
                 panic!("unexpected command: {:?}", actual)
             }
         );
-
 
         // _0
         let expected = TemporaryTranspose {

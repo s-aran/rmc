@@ -143,6 +143,7 @@ impl PartToken {
 #[derive(Debug, Clone, Default)]
 pub(crate) struct PartTokenStack {
     stack: Vec<PartToken>,
+    part_command_stack: PartCommandStack,
 }
 
 impl TokenStackTrait<PartToken> for PartTokenStack {
@@ -156,6 +157,14 @@ impl TokenStackTrait<PartToken> for PartTokenStack {
 }
 
 impl PartTokenStack {
+    pub fn part_command_stack(&self) -> &PartCommandStack {
+        &self.part_command_stack
+    }
+
+    pub fn part_command_stack_mut(&mut self) -> &mut PartCommandStack {
+        &mut self.part_command_stack
+    }
+
     pub fn first(&self) -> Option<&PartToken> {
         self.stack.first()
     }

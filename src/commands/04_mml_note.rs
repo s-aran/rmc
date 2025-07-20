@@ -1,4 +1,5 @@
 use crate::meta_models::{TokenStackTrait, TokenTrait};
+use crate::models::Part;
 use crate::{
     errors::Pass2Error,
     models::{
@@ -27,7 +28,10 @@ impl TryFrom<PartTokenStack> for Note {
         let semitone =
             try_from_get_some_value!(value.pop_and_cast::<NegativePositive>(2), semitone);
         let length = make_some_length(value.pop_by_state_all(3));
-        let dots = count_dots(try_from_get_some_value!(value.pop_and_cast(4), dots));
+        let dots = count_dots(try_from_get_some_value!(
+            value.pop_and_cast::<String>(4),
+            dots
+        ));
 
         Ok(Note {
             command,
@@ -123,32 +127,37 @@ impl TryFrom<PartTokenStack> for Portamento {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        // collect all tokens placed into the stack
-        let tokens = value.stack().clone();
+        let begin_command = try_from_get_value!(value.pop_and_cast(0), begin_command);
+        let maybe_pitch = if let Some(v) = value.part_command_stack_mut().stack_mut().pop() {
+            v
+        } else {
+            panic!("TryFrom for Portamento: unexpected empty stack");
+        };
+        let end_command = try_from_get_value!(value.pop_and_cast(1), begin_command);
 
-        // begin and end markers
-        let begin_command = tokens.first().unwrap().token();
-        let end_command = tokens.last().unwrap().token();
+        let pitch = maybe_pitch
+            .iter()
+            .map(|e| e.data().clone())
+            .filter(|e| match e {
+                PartCommand::Note(_)
+                | PartCommand::Octave(_)
+                | PartCommand::OctaveUp(_)
+                | PartCommand::OctaveDown(_) => true,
+                _ => panic!("TryFrom for Portament: unexpected command: {:?}", e),
+            })
+            .collect::<Vec<PartCommand>>();
 
-        // extract inner pitch commands between begin and end
-        let mut pitch = Vec::new();
-        for tok in &tokens[1..tokens.len() - 1] {
-            // normalize state for individual note token
-            let mut pt = tok.clone();
-            pt.set_state(0);
-            let mut inner_stack = PartTokenStack::default();
-            inner_stack.stack_mut().push(pt);
-            let note = Note::try_from(inner_stack)?;
-            pitch.push(PartCommand::Note(note));
-        }
+        let length1 = try_from_get_some_value!(value.pop_and_cast::<u8>(2), length1);
+        let dots = count_dots(try_from_get_some_value!(value.pop_and_cast(3), dots));
+        let length2 = try_from_get_some_value!(value.pop_and_cast::<u8>(4), length2);
 
         Ok(Portamento {
             begin_command,
             pitch,
             end_command,
-            length1: None,
-            dots: 0,
-            length2: None,
+            length1,
+            dots,
+            length2,
         })
     }
 }
@@ -653,9 +662,9 @@ impl TryFrom<PartTokenStack> for MasterTranspose {
 #[cfg(test)]
 mod tests {
     use crate::{
-        meta_models::{TokenStackTrait, TokenTrait},
+        meta_models::{Code, TokenStackTrait, TokenTrait},
         models::NegativePositive,
-        part_command::{PartToken, PartTokenStack, State},
+        part_command::{PartToken, PartTokenStack, State, WrappedPartCommand},
     };
 
     use super::*;
@@ -1215,11 +1224,33 @@ mod tests {
     fn test_portamento_begin_note_1() {
         let mut tokens = PartTokenStack::default();
         tokens.ez_push(0, "{");
-        tokens.ez_push(1, "c");
-        tokens.ez_push(2, "d");
-        tokens.ez_push(3, "}");
+        tokens.ez_push(1, "}");
 
-        assert_eq!(4, tokens.len());
+        let part_commands = vec![
+            WrappedPartCommand::new(
+                &Code::default(),
+                PartCommand::Note(Note {
+                    command: "c".to_string(),
+                    natural: false,
+                    semitone: None,
+                    length: None,
+                    dots: 0,
+                }),
+            ),
+            WrappedPartCommand::new(
+                &Code::default(),
+                PartCommand::Note(Note {
+                    command: "d".to_string(),
+                    natural: false,
+                    semitone: None,
+                    length: None,
+                    dots: 0,
+                }),
+            ),
+        ];
+        tokens.part_command_stack_mut().push(part_commands);
+
+        assert_eq!(2, tokens.len());
 
         let expected = Portamento {
             begin_command: "{".to_string(),
