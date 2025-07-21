@@ -29,13 +29,19 @@ impl Code {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct MetaData<T> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MetaData<T>
+where
+    T: std::fmt::Debug + Clone + PartialEq + Eq,
+{
     code: Code,
     data: T,
 }
 
-impl<T> MetaData<T> {
+impl<T> MetaData<T>
+where
+    T: std::fmt::Debug + Clone + PartialEq + Eq,
+{
     pub fn new(code: &Code, data: T) -> Self {
         Self {
             code: code.clone(),
@@ -460,9 +466,12 @@ pub(crate) struct Pass2Working {
     pub code: Code,
     pub state: State,
     pub loop_nest: u8,
-    pub push_to_working_stack: bool,
-    pub part_command_stack: PartCommandStack,
     pub commands: Vec<WrappedPartCommand>,
+
+    pub tokens_stack: Vec<PartTokenStack>,
+    pub state_stack: Vec<State>,
+    pub part_command_stack: PartCommandStack,
+    pub push_to_working_stack: bool,
 }
 
 impl Pass2Working {
@@ -481,6 +490,7 @@ impl Pass2Working {
         self.tokens.clear();
         self.token.clear();
         self.state = 0;
+        self.push_to_working_stack = false;
     }
 
     pub fn next(&mut self) {

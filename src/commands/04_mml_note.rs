@@ -1,10 +1,9 @@
 use crate::meta_models::{TokenStackTrait, TokenTrait};
 use crate::models::Part;
+use crate::part_command::WrappedPartCommand;
 use crate::{
     errors::Pass2Error,
-    models::{
-        DivisorClock, NegativePositive, NegativePositiveEqual, NoteCommand, NoteOctaveCommand,
-    },
+    models::{DivisorClock, NegativePositive, NegativePositiveEqual, NoteCommand},
     part_command::{PartCommand, PartCommandStruct, PartTokenStack, count_dots, make_some_length},
 };
 
@@ -572,61 +571,43 @@ impl TryFrom<PartTokenStack> for TemporaryTranspose {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct PartTransposeBegin {
-    pub command: String,
+pub struct PartTranspose {
+    pub command_begin: String,
     pub sign: Option<NegativePositiveEqual>,
-    pub notes: Vec<NoteCommand>,
+    pub notes: Vec<WrappedPartCommand>,
+    pub command_end: String,
 }
 
-impl PartCommandStruct for PartTransposeBegin {
+impl PartCommandStruct for PartTranspose {
     fn to_variant(self) -> PartCommand {
-        PartCommand::PartTransposeBegin(self)
+        PartCommand::PartTranspose(self)
     }
 }
 
-impl TryFrom<PartTokenStack> for PartTransposeBegin {
+impl TryFrom<PartTokenStack> for PartTranspose {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = try_from_get_value!(value.pop_and_cast(1), command);
+        let command_begin = try_from_get_value!(value.pop_and_cast(1), command);
         let sign = try_from_get_some_value!(value.pop_and_cast::<NegativePositiveEqual>(2), sign);
-        let notes = match value.pop_and_cast_vec::<NoteCommand>(3) {
-            Ok(v) => {
+        let notes = match value.part_command_stack_mut().pop_vec() {
+            Some(v) => {
                 if v.len() > 0 {
                     v
                 } else {
                     panic!("TryFrom for PartTranspose (notes) is empty");
                 }
             }
-            Err(e) => panic!("TryFrom for PartTranspose (notes): {}", e),
+            None => panic!("TryFrom for PartTranspose (notes): None"),
         };
+        let command_end = try_from_get_value!(value.pop_and_cast(3), command);
 
         Ok(Self {
-            command,
+            command_begin,
             sign,
             notes,
+            command_end,
         })
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct PartTransposeEnd {
-    pub command: String,
-}
-
-impl PartCommandStruct for PartTransposeEnd {
-    fn to_variant(self) -> PartCommand {
-        PartCommand::PartTransposeEnd(self)
-    }
-}
-
-impl TryFrom<PartTokenStack> for PartTransposeEnd {
-    type Error = Pass2Error;
-
-    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = try_from_get_value!(value.pop_and_cast(0), command);
-
-        Ok(Self { command })
     }
 }
 
@@ -1248,7 +1229,7 @@ mod tests {
                 }),
             ),
         ];
-        tokens.part_command_stack_mut().push(part_commands);
+        tokens.part_command_stack_mut().push_vec(part_commands);
 
         assert_eq!(2, tokens.len());
 

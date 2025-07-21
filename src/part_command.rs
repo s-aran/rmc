@@ -6,7 +6,7 @@ use crate::{
         commands_loop::LocalLoop,
         commands_mml::{
             DefaultLength, MasterTranspose, Note, NoteR, NoteX, Octave, OctaveDown, OctaveReverse,
-            OctaveUp, PartTransposeBegin, PartTransposeEnd, Portamento, ProcessLastLengthAddSub,
+            OctaveUp, PartTranspose, Portamento, ProcessLastLengthAddSub,
             ProcessLastLengthMultiply, ProcessLastLengthUpdate, Quantize1, Quantize2, Slur,
             TemporaryTranspose, Tie,
         },
@@ -264,6 +264,20 @@ impl PartTokenStack {
             None => Ok(None),
         }
     }
+
+    pub fn pop_cast<T>(&mut self) -> Result<Option<T>, <T as FromStr>::Err>
+    where
+        T: FromStr + Clone,
+    {
+        let t = self.stack_mut().pop();
+        match t {
+            Some(e) => match T::from_str(e.token.chars.as_str()) {
+                Ok(v) => Ok(Some(v)),
+                Err(e) => Err(e),
+            },
+            None => Ok(None),
+        }
+    }
 }
 
 pub trait PartCommandStruct: std::fmt::Debug {
@@ -284,14 +298,24 @@ impl PartCommandStack {
         &mut self.stack
     }
 
-    /// Push a set of commands onto the stack (e.g., at a begin of portamento or loop).
-    pub fn push(&mut self, commands: Vec<WrappedPartCommand>) {
+    pub fn push_vec(&mut self, commands: Vec<WrappedPartCommand>) {
         self.stack.push(commands);
     }
 
-    /// Pop the most recently pushed set of commands, if any.
-    pub fn pop(&mut self) -> Option<Vec<WrappedPartCommand>> {
+    pub fn pop_vec(&mut self) -> Option<Vec<WrappedPartCommand>> {
         self.stack.pop()
+    }
+
+    pub fn init_vec(&mut self) {
+        self.stack.push(Vec::new());
+    }
+
+    pub fn push_token(&mut self, token: WrappedPartCommand) {
+        self.stack.last_mut().unwrap().push(token);
+    }
+
+    pub fn pop_token(&mut self) -> Option<WrappedPartCommand> {
+        self.stack.last_mut().unwrap().pop()
     }
 }
 
@@ -326,8 +350,7 @@ pub enum PartCommand {
     Quantize2(Quantize2),
     AbsoluteTranspose(TemporaryTranspose),
     RelativeTranspose(TemporaryTranspose),
-    PartTransposeBegin(PartTransposeBegin),
-    PartTransposeEnd(PartTransposeEnd),
+    PartTranspose(PartTranspose),
     MasterTranspose(MasterTranspose),
 
     LocalLoop(LocalLoop),

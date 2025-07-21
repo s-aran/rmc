@@ -4,6 +4,7 @@ mod meta_models;
 mod models;
 #[macro_use]
 mod part_command;
+mod command_spec;
 mod commands;
 mod pass1;
 mod pass2;

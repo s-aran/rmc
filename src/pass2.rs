@@ -1,19 +1,21 @@
-use std::str::FromStr;
+use std::{str::FromStr, sync::Arc};
 
 use crate::{
     commands::{
         commands_envelope::SsgPcmSoftwareEnvelope,
         commands_loop::LocalLoop,
         commands_mml::{
-            MasterTranspose, Note, Octave, PartTransposeBegin, PartTransposeEnd, Portamento,
-            Quantize1, Quantize2, TemporaryTranspose,
+            MasterTranspose, Note, Octave, PartTranspose, Portamento, Quantize1, Quantize2,
+            TemporaryTranspose,
         },
         commands_volume::Volume,
     },
     errors::Pass2Error,
-    meta_models::{Code, Command, Pass1Result, Pass2Result, Pass2Working, TokenTrait},
+    meta_models::{
+        Code, Command, Pass1Result, Pass2Result, Pass2Working, TokenStackTrait, TokenTrait,
+    },
     models::PartSymbol,
-    part_command::{PartCommand, PartCommandStruct, PartTokenStack, WrappedPartCommand},
+    part_command::{PartCommand, PartCommandStruct, PartToken, PartTokenStack, WrappedPartCommand},
     utils::{ParseUtil, get_type_name, is_n, is_sep},
 };
 
@@ -136,9 +138,12 @@ impl Pass2 {
                             working.push();
                         }
 
+                        println!("end ==> working.tokens = {:?}", working.tokens);
+
                         working.clear();
 
                         result.parts.push((part.clone(), working.commands.clone()));
+                        println!("result.parts: {:?}", result.parts);
                     }
 
                     if let Ok(r) = res {
@@ -229,10 +234,6 @@ impl Pass2 {
 
                     match c {
                         '_' | '{' | 'M' => {
-                            // start of portamento: push current commands and begin nested section
-                            working.part_command_stack.push(working.commands.clone());
-                            working.commands.clear();
-
                             working.eat(c);
                             working.push();
                             return Ok(PartCommand::Nop);
@@ -243,49 +244,65 @@ impl Pass2 {
                         }
                     }
                 }
-                "}" => {
-                    working.push();
-                    working.jump(1);
+                // "}" => {
+                //     working.push();
+                //     working.jump(1);
 
-                    // end of portamento: finalize nested section
-                    let inner_commands = working.commands.clone();
-                    working.commands.clear();
-                    if let Some(prev_commands) = working.part_command_stack.pop() {
-                        working.commands = prev_commands;
-                        // TODO: attach inner_commands to Portamento struct
-                    }
+                //     // end of portamento: finalize nested section
+                //     let inner_commands = working.commands.clone();
+                //     // working.commands.clear();
+                //     if let Some(prev_commands) = working.part_command_stack.pop_vec() {
+                //         working.commands = prev_commands;
+                //         // TODO: attach inner_commands to Portamento struct
+                //     }
 
-                    Self::push_part_command::<Portamento>(working);
-                    // retry parsing after portamento
-                    return self.parse_part_command(working, c);
-                }
+                //     Self::push_part_command::<Portamento>(working);
+                //     // retry parsing after portamento
+                //     return self.parse_part_command(working, c);
+                // }
                 "[" => {
                     working.loop_nest += 1;
-                    // start of loop: push current commands and begin nested section
-                    working.part_command_stack.push(working.commands.clone());
-                    working.commands.clear();
 
-                    working.push();
-                    working.jump(1);
+                    working.push_to_working_stack = true;
+                    working.part_command_stack.init_vec();
+                    working.tokens_stack.push(working.tokens.clone());
+                    working.tokens.clear();
+
+                    working.jump(2);
+                    working.state_stack.push(working.state);
                     return Ok(PartCommand::Nop);
                 }
                 "]" => {
+                    // determine before token
+                    working.tokens = working.tokens_stack.pop().unwrap();
+                    working.state = working.state_stack.pop().unwrap();
+                    working.jump(5);
+                    working.push_to_working_stack = false;
+                    println!("] ==> {:?}", working.tokens);
                     working.loop_nest -= 1;
-                    working.push();
-                    working.jump(1);
                     return Ok(PartCommand::Nop);
                 }
                 ":" => {
-                    // special char in loop
-                    if working.loop_nest > 0 {
-                        working.eat(c);
-                        working.push();
-                        working.jump(1);
-                        // TODO: define pseudo command
-                        return Ok(PartCommand::Nop);
-                    }
+                    // determine before token
+                    working.tokens = if let Some(v) = working.tokens_stack.pop() {
+                        // prepare stack for post part commands
+                        working.part_command_stack.init_vec();
+                        v
+                    } else {
+                        panic!("LocalLoop: invalid stack");
+                    };
+                    working.state = working.state_stack.pop().unwrap();
+                    working.jump(3);
 
-                    panic!("unexpected : command")
+                    working.eat(c);
+                    working.tokens = working.tokens_stack.pop().unwrap();
+                    working.push();
+                    working.tokens_stack.push(working.tokens.clone());
+                    working.tokens.clear();
+
+                    working.jump(4);
+                    working.state_stack.push(working.state);
+                    return Ok(PartCommand::Nop);
                 }
                 "E" => {
                     working.push();
@@ -331,6 +348,7 @@ impl Pass2 {
             }
         }
 
+        println!("tokens ==> {:?} // c={c}", working.tokens);
         match working.tokens.first().unwrap().chars().as_str() {
             "c" | "d" | "e" | "f" | "g" | "a" | "b" => {
                 match c {
@@ -362,7 +380,7 @@ impl Pass2 {
                         working.eat(c);
                         working.jump(3);
                     }
-                    '0'..'9' => {
+                    '0'..='9' => {
                         // length, optional
                         if working.state > 4 {
                             panic!("Note: unexpected {c}");
@@ -397,7 +415,7 @@ impl Pass2 {
             }
             "o" | "o+" | "o-" => {
                 match c {
-                    '0'..'9' => {
+                    '0'..='9' => {
                         // value
                         if working.state > 2 {
                             panic!("Octave: unexpected {c}");
@@ -433,7 +451,7 @@ impl Pass2 {
                         working.eat(c);
                         working.push();
                     }
-                    '0'..'9' => {
+                    '0'..='9' => {
                         // value
                         if working.state > 3 {
                             panic!("Absolute Transpose: unexpected {c}");
@@ -469,24 +487,37 @@ impl Pass2 {
                         working.eat(c);
                         working.push();
                     }
-                    _ => {
+                    '}' => {
                         working.push();
 
-                        // part cpmmand
-                        Self::push_part_command::<PartTransposeBegin>(working);
+                        working.push_to_working_stack = false;
+
+                        Self::push_part_command::<PartTranspose>(working);
+
+                        // retry
+                        return self.parse_part_command(working, c);
+                    }
+                    _ => {
+                        if working.state == 2 {
+                            working.push();
+
+                            working.push_to_working_stack = true;
+
+                            // retry
+                            return self.parse_part_command(working, c);
+                        }
+
+                        // other command
+                        working.push();
+
+                        Self::push_part_command::<TemporaryTranspose>(working);
+
+                        working.clear();
 
                         // retry
                         return self.parse_part_command(working, c);
                     }
                 }
-            }
-            "}" => {
-                working.push();
-
-                Self::push_part_command::<PartTransposeEnd>(working);
-
-                // retry
-                return self.parse_part_command(working, c);
             }
             "_M" => {
                 match c {
@@ -501,7 +532,7 @@ impl Pass2 {
                         working.eat(c);
                         working.push();
                     }
-                    '0'..'9' => {
+                    '0'..='9' => {
                         // value
                         if working.state > 3 {
                             panic!("Master Transpose: unexpected {c}");
@@ -522,42 +553,42 @@ impl Pass2 {
                 }
             }
             "[" => {
-                // loop start: push outer commands, clear for inner
-                working.loop_nest += 1;
-                working.part_command_stack.push(working.commands.clone());
-                working.commands.clear();
+                match c {
+                    '0'..='9' => {
+                        if working.state < 5 {
+                            panic!("LocalLoop: unexpected {c}");
+                        }
 
-                working.push();
-                working.jump(1);
-                return Ok(PartCommand::Nop);
-            }
-            ":" => {
-                // loop break: mark break
-                if working.loop_nest > 0 {
-                    working.eat(c);
-                    working.push();
-                    working.jump(1);
-                    return Ok(PartCommand::Nop);
-                }
-                panic!("Unexpected ':' outside loop");
-            }
-            "]" => {
-                // loop end: finalize nested section
-                working.loop_nest -= 1;
-                working.push();
-                working.jump(1);
+                        if working.state == 5 {}
 
-                let inner = working.commands.clone();
-                working.commands.clear();
-                if let Some(prev) = working.part_command_stack.pop() {
-                    working.commands = prev;
+                        working.eat(c);
+                        working.jump(6);
+                    }
+                    _ => {
+                        if working.state == 2 {
+                            println!("state == 2: {:?}", working.tokens);
+                            return Ok(PartCommand::Nop);
+                        }
+
+                        if working.state == 4 {
+                            println!("state == 4: {:?}", working.tokens);
+                            return Ok(PartCommand::Nop);
+                        }
+
+                        // other command
+                        working.push();
+
+                        let pops = working.tokens.part_command_stack().stack().len();
+                        Self::push_block_part_command::<LocalLoop>(working, pops);
+
+                        // retry
+                        return self.parse_part_command(working, c);
+                    }
                 }
-                Self::push_part_command::<LocalLoop>(working);
-                return self.parse_part_command(working, c);
             }
             "E" => {
                 match c {
-                    '0'..'9' => {
+                    '0'..='9' => {
                         if working.state == 2 {
                             // sign is not specified
                             working.next();
@@ -587,7 +618,7 @@ impl Pass2 {
             }
             "v" | "V" | "v+" | "v-" | "v)" | "v(" => {
                 match c {
-                    '0'..'9' => {
+                    '0'..='9' => {
                         working.eat(c);
                         working.jump(2);
                     }
@@ -609,7 +640,7 @@ impl Pass2 {
                         working.push();
                         working.jump(2);
                     }
-                    '0'..'9' => {
+                    '0'..='9' => {
                         working.eat(c);
                         working.jump(3);
                     }
@@ -644,7 +675,7 @@ impl Pass2 {
                         working.push();
                         working.next();
                     }
-                    '0'..'9' => {
+                    '0'..='9' => {
                         working.eat(c);
                     }
                     '.' => {
@@ -699,16 +730,38 @@ impl Pass2 {
             command.to_variant(),
         );
 
-        working.commands.push(w);
+        if working.push_to_working_stack {
+            println!("==> push to part_command_stack: {:?}", w);
+            working.part_command_stack.push_token(w);
+        } else {
+            println!("==> push commands: {:?}", w);
+            working.commands.push(w);
+        }
 
         working.clear();
+    }
+
+    fn push_block_part_command<T>(working: &mut Pass2Working, pops: usize)
+    where
+        T: TryFrom<PartTokenStack, Error = Pass2Error> + PartCommandStruct,
+    {
+        working.tokens.part_command_stack_mut().init_vec();
+        for _ in 0..pops {
+            if let Some(v) = working.part_command_stack.pop_vec() {
+                working.tokens.part_command_stack_mut().push_vec(v);
+            } else {
+                panic!("{}: part command stack is empty", get_type_name::<T>());
+            }
+        }
+
+        Self::push_part_command::<T>(working);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        models::{DivisorClock, NegativePositive, NegativePositiveEqual, NoteCommand, PartSymbol},
+        models::{DivisorClock, NegativePositive, NegativePositiveEqual, PartSymbol},
         pass1::Pass1,
     };
 
@@ -730,8 +783,10 @@ mod tests {
         let part_g_list = result.get_parts(&PartSymbol::G);
         assert_eq!(1, part_g_list.len());
 
+        println!("{:?}", part_g_list);
+
         let g_commands = part_g_list.get(0).unwrap();
-        assert_eq!(14, g_commands.len());
+        assert_eq!(13, g_commands.len());
 
         // c+4
         let expected = Note {
@@ -926,29 +981,47 @@ mod tests {
         );
 
         // _{-eab
-        let expected = PartTransposeBegin {
-            command: "_{".to_string(),
+        let expected = PartTranspose {
+            command_begin: "_{".to_string(),
             sign: Some(NegativePositiveEqual::Negative),
-            notes: vec![NoteCommand::e, NoteCommand::a, NoteCommand::b],
+            notes: vec![
+                WrappedPartCommand::new(
+                    &Code::default(),
+                    PartCommand::Note(Note {
+                        command: "e".to_string(),
+                        natural: false,
+                        semitone: None,
+                        length: None,
+                        dots: 0,
+                    }),
+                ),
+                WrappedPartCommand::new(
+                    &Code::default(),
+                    PartCommand::Note(Note {
+                        command: "a".to_string(),
+                        natural: false,
+                        semitone: None,
+                        length: None,
+                        dots: 0,
+                    }),
+                ),
+                WrappedPartCommand::new(
+                    &Code::default(),
+                    PartCommand::Note(Note {
+                        command: "b".to_string(),
+                        natural: false,
+                        semitone: None,
+                        length: None,
+                        dots: 0,
+                    }),
+                ),
+            ],
+            command_end: "_{".to_string(),
         };
         let actual = g_commands.get(13).unwrap();
         assert_eq!(
             expected,
-            if let PartCommand::PartTransposeBegin(ref c) = *actual.data() {
-                c.clone()
-            } else {
-                panic!("unexpected command: {:?}", actual)
-            }
-        );
-
-        // }
-        let expected = PartTransposeEnd {
-            command: "}".to_string(),
-        };
-        let actual = g_commands.get(14).unwrap();
-        assert_eq!(
-            expected,
-            if let PartCommand::PartTransposeEnd(ref c) = *actual.data() {
+            if let PartCommand::PartTranspose(ref c) = *actual.data() {
                 c.clone()
             } else {
                 panic!("unexpected command: {:?}", actual)

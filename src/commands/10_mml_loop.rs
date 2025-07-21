@@ -6,7 +6,9 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalLoop {
     pub begin_command: String,
-    pub commands: Vec<PartCommand>,
+    pub body_pre: Vec<PartCommand>,
+    pub separator: String,
+    pub body_post: Vec<PartCommand>,
     pub break_commands: Vec<PartCommand>,
     pub count: Option<u8>,
 }
@@ -26,7 +28,9 @@ impl TryFrom<PartTokenStack> for LocalLoop {
 
         Ok(LocalLoop {
             begin_command: begin,
-            commands: Vec::new(),
+            body_pre: Vec::new(),
+            separator: "".to_string(),
+            body_post: Vec::new(),
             break_commands: Vec::new(),
             count,
         })
