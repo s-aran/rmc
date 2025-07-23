@@ -490,7 +490,6 @@ impl Pass2Working {
         self.tokens.clear();
         self.token.clear();
         self.state = 0;
-        self.push_to_working_stack = false;
     }
 
     pub fn next(&mut self) {
@@ -499,6 +498,32 @@ impl Pass2Working {
 
     pub fn jump(&mut self, state: State) {
         self.state = state;
+    }
+
+    pub fn switch_push_to_stack(&mut self) {
+        self.push_to_working_stack = true;
+    }
+
+    pub fn switch_push_to_commands(&mut self) {
+        self.push_to_working_stack = false;
+    }
+
+    pub fn save_to_stack(&mut self) {
+        self.tokens.push(&self.token);
+        self.tokens_stack.push(self.tokens.clone());
+        self.state_stack.push(self.state);
+
+        self.token.clear();
+        self.tokens.clear();
+        self.state = 0;
+    }
+
+    pub fn load_from_stack(&mut self) {
+        self.tokens = self.tokens_stack.pop().unwrap();
+        if self.tokens.len() > 1 {
+            self.token = self.tokens.pop().unwrap();
+        }
+        self.state = self.state_stack.pop().unwrap();
     }
 }
 

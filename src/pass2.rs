@@ -16,7 +16,7 @@ use crate::{
     },
     models::PartSymbol,
     part_command::{PartCommand, PartCommandStruct, PartToken, PartTokenStack, WrappedPartCommand},
-    utils::{get_type_name, is_n, is_sep, ParseUtil},
+    utils::{ParseUtil, get_type_name, is_n, is_sep},
 };
 
 #[derive(Debug, Clone)]
@@ -199,7 +199,7 @@ impl Pass2 {
             }
 
             if working.tokens_stack.len() > 0 {
-                Self::process_block_end_if(working, c);
+                // Self::process_block_end_if(working, c);
             }
 
             if working.token.is_empty() {
@@ -241,6 +241,7 @@ impl Pass2 {
                         '_' | '{' | 'M' => {
                             working.eat(c);
                             working.push();
+
                             return Ok(PartCommand::Nop);
                         }
                         _ => {
@@ -249,39 +250,47 @@ impl Pass2 {
                         }
                     }
                 }
-                // "}" => {
-                //     working.push();
-                //     working.jump(1);
-
-                //     // end of portamento: finalize nested section
-                //     let inner_commands = working.commands.clone();
-                //     // working.commands.clear();
-                //     if let Some(prev_commands) = working.part_command_stack.pop_vec() {
-                //         working.commands = prev_commands;
-                //         // TODO: attach inner_commands to Portamento struct
-                //     }
-
-                //     Self::push_part_command::<Portamento>(working);
-                //     // retry parsing after portamento
-                //     return self.parse_part_command(working, c);
-                // }
+                "}" => {
+                    working.load_from_stack();
+                    working.jump(2);
+                    working.switch_push_to_commands();
+                    working.loop_nest -= 1;
+                }
                 "[" => {
                     println!("LocalLoop begin {c}:");
                     working.loop_nest += 1;
 
-                    working.push_to_working_stack = true;
-                    working.part_command_stack.init_vec();
-                    working.tokens.push(&working.token);
-                    working.tokens_stack.push(working.tokens.clone());
-                    working.token.clear();
-                    working.tokens.clear();
-
+                    working.push();
                     working.jump(2);
-                    working.state_stack.push(working.state);
-                    working.state = 0;
+
+                    println!("saving:");
+                    println!("* token: {:?}", working.token);
+                    println!("* tokens: {:?}", working.tokens);
+                    println!("* tokens_stack: {:?}", working.tokens_stack);
+                    println!("* pc_stack: {:?}", working.part_command_stack);
+
+                    working.switch_push_to_stack();
+                    working.part_command_stack.init_vec();
+                    working.save_to_stack();
+
                     return Ok(PartCommand::Nop);
                 }
-                "]" => {}
+                "]" => {
+                    println!("LocalLoop end {c}:");
+
+                    working.load_from_stack();
+                    working.jump(5);
+                    working.switch_push_to_commands();
+                    working.loop_nest -= 1;
+
+                    println!("loaded:");
+                    println!("* token: {:?}", working.token);
+                    println!("* tokens: {:?}", working.tokens);
+                    println!("* tokens_stack: {:?}", working.tokens_stack);
+                    println!("* pc_stack: {:?}", working.part_command_stack);
+
+                    // fall through
+                }
                 ":" => {
                     // determine before token
                     working.tokens = if let Some(v) = working.tokens_stack.pop() {
@@ -475,6 +484,12 @@ impl Pass2 {
                 }
             }
             "_{" => {
+                if working.state == 1 {
+                    working.switch_push_to_stack();
+                    working.part_command_stack.init_vec();
+                    working.save_to_stack();
+                }
+
                 match c {
                     '+' | '-' | '=' => {
                         // semitone|natural, optional
@@ -490,7 +505,7 @@ impl Pass2 {
                     '}' => {
                         working.push();
 
-                        working.push_to_working_stack = false;
+                        // working.push_to_working_stack = false;
 
                         Self::push_part_command::<PartTranspose>(working);
 
@@ -498,19 +513,19 @@ impl Pass2 {
                         return self.parse_part_command(working, c);
                     }
                     _ => {
-                        if working.state == 2 {
-                            working.push();
+                        // if working.state == 2 {
+                        //     working.push();
 
-                            working.push_to_working_stack = true;
+                        //     // working.push_to_working_stack = true;
 
-                            // retry
-                            return self.parse_part_command(working, c);
-                        }
+                        //     // retry
+                        //     return self.parse_part_command(working, c);
+                        // }
 
-                        // other command
-                        working.push();
+                        // // other command
+                        // working.push();
 
-                        Self::push_part_command::<TemporaryTranspose>(working);
+                        // Self::push_part_command::<TemporaryTranspose>(working);
 
                         working.clear();
 
@@ -566,21 +581,24 @@ impl Pass2 {
                         working.eat(c);
                         working.jump(6);
                     }
-                    _ => {
-                        if working.state == 2 {
-                            println!("state == 2: {:?}", working.tokens);
-                            return Ok(PartCommand::Nop);
+                    ']' => {
+                        if working.state != 5 {
+                            panic!("LocalLoop: unexpected {c}");
                         }
 
-                        if working.state == 4 {
-                            println!("state == 4: {:?}", working.tokens);
-                            return Ok(PartCommand::Nop);
+                        working.push();
+                        working.jump(6);
+                    }
+                    _ => {
+                        if working.state != 6 {
+                            panic!("LocalLoop: unexpected {c}");
                         }
 
                         // other command
                         working.push();
 
-                        let pops = working.tokens.part_command_stack().stack().len();
+                        let pops = working.part_command_stack.stack().len();
+                        println!("pops: {pops}");
                         Self::push_block_part_command::<LocalLoop>(working, pops);
 
                         // retry
