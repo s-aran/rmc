@@ -23,6 +23,7 @@ impl TryFrom<PartTokenStack> for LocalLoop {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        println!("TryFrom LocalLoop: {:?}", value);
         let begin = try_from_get_value!(value.pop_and_cast::<String>(0), begin);
         let count = try_from_get_some_value!(value.pop_and_cast::<u8>(1), count);
 

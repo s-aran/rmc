@@ -16,7 +16,7 @@ use crate::{
     },
     models::PartSymbol,
     part_command::{PartCommand, PartCommandStruct, PartToken, PartTokenStack, WrappedPartCommand},
-    utils::{ParseUtil, get_type_name, is_n, is_sep},
+    utils::{get_type_name, is_n, is_sep, ParseUtil},
 };
 
 #[derive(Debug, Clone)]
@@ -192,9 +192,14 @@ impl Pass2 {
         //     working.tokens.first().is_some()
         // );
 
+        println!("tokens: {:?} // {:?}", working.tokens, working.token);
         if working.tokens.first().is_none() {
             if working.token.is_empty() && is_sep(c) {
                 return Ok(PartCommand::Nop);
+            }
+
+            if working.tokens_stack.len() > 0 {
+                Self::process_block_end_if(working, c);
             }
 
             if working.token.is_empty() {
@@ -261,27 +266,22 @@ impl Pass2 {
                 //     return self.parse_part_command(working, c);
                 // }
                 "[" => {
+                    println!("LocalLoop begin {c}:");
                     working.loop_nest += 1;
 
                     working.push_to_working_stack = true;
                     working.part_command_stack.init_vec();
+                    working.tokens.push(&working.token);
                     working.tokens_stack.push(working.tokens.clone());
+                    working.token.clear();
                     working.tokens.clear();
 
                     working.jump(2);
                     working.state_stack.push(working.state);
+                    working.state = 0;
                     return Ok(PartCommand::Nop);
                 }
-                "]" => {
-                    // determine before token
-                    working.tokens = working.tokens_stack.pop().unwrap();
-                    working.state = working.state_stack.pop().unwrap();
-                    working.jump(5);
-                    working.push_to_working_stack = false;
-                    println!("] ==> {:?}", working.tokens);
-                    working.loop_nest -= 1;
-                    return Ok(PartCommand::Nop);
-                }
+                "]" => {}
                 ":" => {
                     // determine before token
                     working.tokens = if let Some(v) = working.tokens_stack.pop() {
@@ -559,7 +559,9 @@ impl Pass2 {
                             panic!("LocalLoop: unexpected {c}");
                         }
 
-                        if working.state == 5 {}
+                        if working.state == 5 {
+                            //
+                        }
 
                         working.eat(c);
                         working.jump(6);
@@ -714,6 +716,33 @@ impl Pass2 {
         Ok(PartCommand::Nop)
     }
 
+    fn process_block_end_if(working: &mut Pass2Working, c: char) {
+        match c {
+            ']' => {
+                println!("LocalLoop end:");
+                println!("----------");
+                println!("tokens_stack: {:?}", working.tokens_stack);
+                println!("tokens: {:?}", working.tokens);
+                println!("token: {:?}", working.token);
+                println!("----------");
+                // determine before token
+                working.tokens = working.tokens_stack.pop().unwrap();
+                // working.token = working.tokens.pop().unwrap();
+                working.state = working.state_stack.pop().unwrap();
+                println!("tokens_stack: {:?}", working.tokens_stack);
+                println!("tokens: {:?}", working.tokens);
+                println!("token: {:?}", working.token);
+                println!("----------");
+                working.jump(5);
+                working.push_to_working_stack = false;
+                println!("] ==> {:?}", working.tokens);
+                working.loop_nest -= 1;
+                // return Ok(PartCommand::Nop);
+            }
+            _ => {}
+        }
+    }
+
     fn push_part_command<T>(working: &mut Pass2Working)
     where
         T: TryFrom<PartTokenStack, Error = Pass2Error> + PartCommandStruct,
@@ -730,6 +759,7 @@ impl Pass2 {
             command.to_variant(),
         );
 
+        println!("{}", working.push_to_working_stack);
         if working.push_to_working_stack {
             println!("==> push to part_command_stack: {:?}", w);
             working.part_command_stack.push_token(w);
