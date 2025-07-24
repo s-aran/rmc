@@ -16,7 +16,7 @@ use crate::{
     },
     models::PartSymbol,
     part_command::{PartCommand, PartCommandStruct, PartToken, PartTokenStack, WrappedPartCommand},
-    utils::{ParseUtil, get_type_name, is_n, is_sep},
+    utils::{get_type_name, is_n, is_sep, ParseUtil},
 };
 
 #[derive(Debug, Clone)]
@@ -192,7 +192,7 @@ impl Pass2 {
         //     working.tokens.first().is_some()
         // );
 
-        println!("tokens: {:?} // {:?}", working.tokens, working.token);
+        // println!("tokens: {:?} // {:?}", working.tokens, working.token);
         if working.tokens.first().is_none() {
             if working.token.is_empty() && is_sep(c) {
                 return Ok(PartCommand::Nop);
@@ -251,10 +251,12 @@ impl Pass2 {
                     }
                 }
                 "}" => {
+                    println!("Portamento end:");
                     working.load_from_stack();
                     working.jump(2);
                     working.switch_push_to_commands();
-                    working.loop_nest -= 1;
+
+                    return Ok(PartCommand::Nop);
                 }
                 "[" => {
                     println!("LocalLoop begin {c}:");
@@ -303,13 +305,7 @@ impl Pass2 {
                     working.state = working.state_stack.pop().unwrap();
                     working.jump(3);
 
-                    working.eat(c);
-                    working.tokens = working.tokens_stack.pop().unwrap();
-                    working.push();
-                    working.tokens_stack.push(working.tokens.clone());
-                    working.tokens.clear();
-
-                    working.jump(4);
+                    working.part_command_stack.init_vec();
                     working.state_stack.push(working.state);
                     return Ok(PartCommand::Nop);
                 }
@@ -357,7 +353,7 @@ impl Pass2 {
             }
         }
 
-        println!("tokens ==> {:?} // c={c}", working.tokens);
+        // println!("tokens ==> {:?} // c={c}", working.tokens);
         match working.tokens.first().unwrap().chars().as_str() {
             "c" | "d" | "e" | "f" | "g" | "a" | "b" => {
                 match c {
@@ -484,12 +480,6 @@ impl Pass2 {
                 }
             }
             "_{" => {
-                if working.state == 1 {
-                    working.switch_push_to_stack();
-                    working.part_command_stack.init_vec();
-                    working.save_to_stack();
-                }
-
                 match c {
                     '+' | '-' | '=' => {
                         // semitone|natural, optional
@@ -501,10 +491,16 @@ impl Pass2 {
 
                         working.eat(c);
                         working.push();
+
+                        working.switch_push_to_stack();
+                        working.part_command_stack.init_vec();
+                        working.save_to_stack();
                     }
                     '}' => {
                         working.push();
 
+                        working.switch_push_to_commands();
+                        working.load_from_stack();
                         // working.push_to_working_stack = false;
 
                         Self::push_part_command::<PartTranspose>(working);
