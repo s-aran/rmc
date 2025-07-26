@@ -487,6 +487,7 @@ impl Pass2Working {
     }
 
     pub fn clear(&mut self) {
+        self.tokens.stack_mut().clear();
         self.tokens.clear();
         self.token.clear();
         self.state = 0;
@@ -519,10 +520,15 @@ impl Pass2Working {
     }
 
     pub fn load_from_stack(&mut self) {
-        self.tokens = self.tokens_stack.pop().unwrap();
-        if self.tokens.len() > 1 {
-            self.token = self.tokens.pop().unwrap();
-        }
+        self.tokens = if let Some(v) = self.tokens_stack.pop() {
+            v
+        } else {
+            panic!("loadl_from_stack: tokens_stack is empty")
+        };
+
+        // if self.tokens.len() > 1 {
+        //     self.token = self.tokens.pop().unwrap();
+        // }
         self.state = self.state_stack.pop().unwrap();
     }
 }

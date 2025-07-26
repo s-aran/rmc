@@ -1,7 +1,6 @@
 use crate::{
     errors::Pass2Error,
     part_command::{PartCommand, PartCommandStruct, PartTokenStack, WrappedPartCommand},
-    utils::some_vec,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,6 +24,7 @@ impl TryFrom<PartTokenStack> for LocalLoop {
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
         println!("TryFrom LocalLoop: {:?}", value);
+
         let begin_command = try_from_get_value!(value.pop_and_cast::<String>(0), begin_command);
         let body_pre = value.part_command_stack_mut().pop_vec().unwrap_or_default();
         let end_command = try_from_get_value!(value.pop_and_cast::<String>(5), end_comamnd);

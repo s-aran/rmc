@@ -169,6 +169,13 @@ impl PartTokenStack {
         self.stack.first()
     }
 
+    pub fn drain(&mut self) -> Self {
+        Self {
+            stack: self.stack.drain(..).collect(),
+            part_command_stack: self.part_command_stack.drain(),
+        }
+    }
+
     pub fn dequeue(&mut self) -> Option<PartToken> {
         if self.stack.len() > 0 {
             return Some(self.stack.remove(0));
@@ -296,6 +303,12 @@ impl PartCommandStack {
 
     pub fn stack_mut(&mut self) -> &mut Vec<Vec<WrappedPartCommand>> {
         &mut self.stack
+    }
+
+    pub fn drain(&mut self) -> Self {
+        Self {
+            stack: self.stack.drain(..).collect(),
+        }
     }
 
     pub fn push_vec(&mut self, commands: Vec<WrappedPartCommand>) {

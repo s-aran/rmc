@@ -16,7 +16,7 @@ use crate::{
     },
     models::PartSymbol,
     part_command::{PartCommand, PartCommandStruct, PartToken, PartTokenStack, WrappedPartCommand},
-    utils::{get_type_name, is_n, is_sep, ParseUtil},
+    utils::{ParseUtil, get_type_name, is_n, is_sep},
 };
 
 #[derive(Debug, Clone)]
@@ -138,7 +138,7 @@ impl Pass2 {
                             working.push();
                         }
 
-                        println!("end ==> working.tokens = {:?}", working.tokens);
+                        // println!("end ==> working.tokens = {:?}", working.tokens);
 
                         working.clear();
 
@@ -198,10 +198,6 @@ impl Pass2 {
                 return Ok(PartCommand::Nop);
             }
 
-            if working.tokens_stack.len() > 0 {
-                // Self::process_block_end_if(working, c);
-            }
-
             if working.token.is_empty() {
                 working.eat(c);
             }
@@ -251,25 +247,29 @@ impl Pass2 {
                     }
                 }
                 "}" => {
-                    println!("Portamento end:");
                     working.load_from_stack();
-                    working.jump(2);
+                    working.jump(3);
                     working.switch_push_to_commands();
 
-                    return Ok(PartCommand::Nop);
+                    // println!("loaded:");
+                    // println!("* token: {:?}", working.token);
+                    // println!("* tokens: {:?}", working.tokens);
+                    // println!("* tokens_stack: {:?}", working.tokens_stack);
+                    // println!("* pc_stack: {:?}", working.part_command_stack);
+
+                    // fall througbh
                 }
                 "[" => {
-                    println!("LocalLoop begin {c}:");
                     working.loop_nest += 1;
 
                     working.push();
                     working.jump(2);
 
-                    println!("saving:");
-                    println!("* token: {:?}", working.token);
-                    println!("* tokens: {:?}", working.tokens);
-                    println!("* tokens_stack: {:?}", working.tokens_stack);
-                    println!("* pc_stack: {:?}", working.part_command_stack);
+                    // println!("saving:");
+                    // println!("* token: {:?}", working.token);
+                    // println!("* tokens: {:?}", working.tokens);
+                    // println!("* tokens_stack: {:?}", working.tokens_stack);
+                    // println!("* pc_stack: {:?}", working.part_command_stack);
 
                     working.switch_push_to_stack();
                     working.part_command_stack.init_vec();
@@ -278,18 +278,18 @@ impl Pass2 {
                     return Ok(PartCommand::Nop);
                 }
                 "]" => {
-                    println!("LocalLoop end {c}:");
+                    // println!("LocalLoop end {c}:");
 
                     working.load_from_stack();
                     working.jump(5);
                     working.switch_push_to_commands();
                     working.loop_nest -= 1;
 
-                    println!("loaded:");
-                    println!("* token: {:?}", working.token);
-                    println!("* tokens: {:?}", working.tokens);
-                    println!("* tokens_stack: {:?}", working.tokens_stack);
-                    println!("* pc_stack: {:?}", working.part_command_stack);
+                    // println!("loaded:");
+                    // println!("* token: {:?}", working.token);
+                    // println!("* tokens: {:?}", working.tokens);
+                    // println!("* tokens_stack: {:?}", working.tokens_stack);
+                    // println!("* pc_stack: {:?}", working.part_command_stack);
 
                     // fall through
                 }
@@ -492,38 +492,35 @@ impl Pass2 {
                         working.eat(c);
                         working.push();
 
+                        working.jump(3);
+
+                        // println!("saving:");
+                        // println!("* token: {:?}", working.token);
+                        // println!("* tokens: {:?}", working.tokens);
+                        // println!("* tokens_stack: {:?}", working.tokens_stack);
+                        // println!("* pc_stack: {:?}", working.part_command_stack);
+
                         working.switch_push_to_stack();
                         working.part_command_stack.init_vec();
                         working.save_to_stack();
                     }
                     '}' => {
+                        if working.state <= 2 {
+                            panic!("Part Transpose: unexpecetd {c}");
+                        }
+
+                        // working.eat(c);
                         working.push();
-
-                        working.switch_push_to_commands();
-                        working.load_from_stack();
-                        // working.push_to_working_stack = false;
-
-                        Self::push_part_command::<PartTranspose>(working);
-
-                        // retry
-                        return self.parse_part_command(working, c);
                     }
                     _ => {
-                        // if working.state == 2 {
-                        //     working.push();
+                        if working.state != 3 {
+                            panic!("Part Transpose: unexpected {c}");
+                        }
 
-                        //     // working.push_to_working_stack = true;
-
-                        //     // retry
-                        //     return self.parse_part_command(working, c);
-                        // }
-
-                        // // other command
-                        // working.push();
-
-                        // Self::push_part_command::<TemporaryTranspose>(working);
-
-                        working.clear();
+                        // other command
+                        // let pops = working.part_command_stack.stack().len();
+                        let pops = 1;
+                        Self::push_block_part_command::<PartTranspose>(working, pops);
 
                         // retry
                         return self.parse_part_command(working, c);
@@ -593,8 +590,14 @@ impl Pass2 {
                         // other command
                         working.push();
 
-                        let pops = working.part_command_stack.stack().len();
-                        println!("pops: {pops}");
+                        // let pops = working.part_command_stack.stack().len();
+                        let pops = if let Some(v) = working.tokens.get(2)
+                            && v.chars() == ":"
+                        {
+                            2
+                        } else {
+                            1
+                        };
                         Self::push_block_part_command::<LocalLoop>(working, pops);
 
                         // retry
@@ -730,50 +733,23 @@ impl Pass2 {
         Ok(PartCommand::Nop)
     }
 
-    fn process_block_end_if(working: &mut Pass2Working, c: char) {
-        match c {
-            ']' => {
-                println!("LocalLoop end:");
-                println!("----------");
-                println!("tokens_stack: {:?}", working.tokens_stack);
-                println!("tokens: {:?}", working.tokens);
-                println!("token: {:?}", working.token);
-                println!("----------");
-                // determine before token
-                working.tokens = working.tokens_stack.pop().unwrap();
-                // working.token = working.tokens.pop().unwrap();
-                working.state = working.state_stack.pop().unwrap();
-                println!("tokens_stack: {:?}", working.tokens_stack);
-                println!("tokens: {:?}", working.tokens);
-                println!("token: {:?}", working.token);
-                println!("----------");
-                working.jump(5);
-                working.push_to_working_stack = false;
-                println!("] ==> {:?}", working.tokens);
-                working.loop_nest -= 1;
-                // return Ok(PartCommand::Nop);
-            }
-            _ => {}
-        }
-    }
-
     fn push_part_command<T>(working: &mut Pass2Working)
     where
         T: TryFrom<PartTokenStack, Error = Pass2Error> + PartCommandStruct,
     {
-        let command = match T::try_from(working.tokens.clone()) {
+        let code = working.tokens.first().unwrap().get_code().clone();
+        let tokens = working.tokens.drain();
+        let command = match T::try_from(tokens) {
             Ok(v) => v,
             Err(e) => panic!("{}: {} // {:?}", get_type_name::<T>(), e, working.tokens),
         };
 
-        println!("==> {}: {:?}", get_type_name::<T>(), command);
+        // println!("==> {}: {:?}", get_type_name::<T>(), command);
+        // println!("==> {:?}", working);
 
-        let w = WrappedPartCommand::new(
-            working.tokens.first().unwrap().get_code(),
-            command.to_variant(),
-        );
+        let w = WrappedPartCommand::new(&code, command.to_variant());
 
-        println!("{}", working.push_to_working_stack);
+        // println!("{}", working.push_to_working_stack);
         if working.push_to_working_stack {
             println!("==> push to part_command_stack: {:?}", w);
             working.part_command_stack.push_token(w);
@@ -789,14 +765,19 @@ impl Pass2 {
     where
         T: TryFrom<PartTokenStack, Error = Pass2Error> + PartCommandStruct,
     {
-        working.tokens.part_command_stack_mut().init_vec();
-        for _ in 0..pops {
-            if let Some(v) = working.part_command_stack.pop_vec() {
-                working.tokens.part_command_stack_mut().push_vec(v);
-            } else {
-                panic!("{}: part command stack is empty", get_type_name::<T>());
-            }
+        // working.tokens.part_command_stack_mut().init_vec();
+        if let Some(v) = working.part_command_stack.pop_vec() {
+            working.tokens.part_command_stack_mut().push_vec(v);
+        } else {
+            panic!("{}: part command stack is empty", get_type_name::<T>());
         }
+        // for _ in 0..pops {
+        //     if let Some(v) = working.part_command_stack.pop_vec() {
+        //         working.tokens.part_command_stack_mut().push_vec(v);
+        //     } else {
+        //         panic!("{}: part command stack is empty", get_type_name::<T>());
+        //     }
+        // }
 
         Self::push_part_command::<T>(working);
     }
@@ -830,7 +811,7 @@ mod tests {
         println!("{:?}", part_g_list);
 
         let g_commands = part_g_list.get(0).unwrap();
-        assert_eq!(13, g_commands.len());
+        assert_eq!(12, g_commands.len());
 
         // c+4
         let expected = Note {
@@ -974,34 +955,50 @@ mod tests {
             }
         );
 
-        // e
-        let expected = Note {
-            command: "e".to_string(),
-            natural: false,
-            semitone: None,
-            length: None,
-            dots: 0,
+        // [e__+1]8
+        let expected = LocalLoop {
+            begin_command: "[".to_string(),
+            body_pre: vec![
+                WrappedPartCommand::new(
+                    &Code {
+                        file_name: "".to_string(),
+                        lines: 0,
+                        chars: 28,
+                    },
+                    // e
+                    (Note {
+                        command: "e".to_string(),
+                        natural: false,
+                        semitone: None,
+                        length: None,
+                        dots: 0,
+                    })
+                    .to_variant(),
+                ),
+                WrappedPartCommand::new(
+                    &Code {
+                        file_name: "".to_string(),
+                        lines: 0,
+                        chars: 30,
+                    },
+                    // __+1
+                    (TemporaryTranspose {
+                        command: "__".to_string(),
+                        semitone: Some(NegativePositive::Positive),
+                        value: 1,
+                    })
+                    .to_variant(),
+                ),
+            ],
+            separator: None,
+            body_post: vec![],
+            end_command: "]".to_string(),
+            count: Some(8),
         };
-        let actual = g_commands.get(9).unwrap();
+        let actual = g_commands.get(8).unwrap();
         assert_eq!(
             expected,
-            if let PartCommand::Note(ref c) = *actual.data() {
-                c.clone()
-            } else {
-                panic!("unexpected command: {:?}", actual)
-            }
-        );
-
-        // __+1
-        let expected = TemporaryTranspose {
-            command: "__".to_string(),
-            semitone: Some(NegativePositive::Positive),
-            value: 1,
-        };
-        let actual = g_commands.get(10).unwrap();
-        assert_eq!(
-            expected,
-            if let PartCommand::RelativeTranspose(ref c) = *actual.data() {
+            if let PartCommand::LocalLoop(ref c) = *actual.data() {
                 c.clone()
             } else {
                 panic!("unexpected command: {:?}", actual)
@@ -1014,7 +1011,7 @@ mod tests {
             semitone: None,
             value: 0,
         };
-        let actual = g_commands.get(12).unwrap();
+        let actual = g_commands.get(9).unwrap();
         assert_eq!(
             expected,
             if let PartCommand::AbsoluteTranspose(ref c) = *actual.data() {
@@ -1024,13 +1021,17 @@ mod tests {
             }
         );
 
-        // _{-eab
+        // _{-eab}
         let expected = PartTranspose {
             command_begin: "_{".to_string(),
             sign: Some(NegativePositiveEqual::Negative),
             notes: vec![
                 WrappedPartCommand::new(
-                    &Code::default(),
+                    &Code {
+                        file_name: "".to_string(),
+                        lines: 0,
+                        chars: 40,
+                    },
                     PartCommand::Note(Note {
                         command: "e".to_string(),
                         natural: false,
@@ -1040,7 +1041,11 @@ mod tests {
                     }),
                 ),
                 WrappedPartCommand::new(
-                    &Code::default(),
+                    &Code {
+                        file_name: "".to_string(),
+                        lines: 0,
+                        chars: 41,
+                    },
                     PartCommand::Note(Note {
                         command: "a".to_string(),
                         natural: false,
@@ -1050,7 +1055,11 @@ mod tests {
                     }),
                 ),
                 WrappedPartCommand::new(
-                    &Code::default(),
+                    &Code {
+                        file_name: "".to_string(),
+                        lines: 0,
+                        chars: 42,
+                    },
                     PartCommand::Note(Note {
                         command: "b".to_string(),
                         natural: false,
@@ -1060,9 +1069,9 @@ mod tests {
                     }),
                 ),
             ],
-            command_end: "_{".to_string(),
+            command_end: "}".to_string(),
         };
-        let actual = g_commands.get(13).unwrap();
+        let actual = g_commands.get(10).unwrap();
         assert_eq!(
             expected,
             if let PartCommand::PartTranspose(ref c) = *actual.data() {
@@ -1078,7 +1087,7 @@ mod tests {
             sign: Some(NegativePositive::Positive),
             value: 120,
         };
-        let actual = g_commands.get(15).unwrap();
+        let actual = g_commands.get(11).unwrap();
         assert_eq!(
             expected,
             if let PartCommand::MasterTranspose(ref c) = *actual.data() {
