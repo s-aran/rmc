@@ -1,6 +1,6 @@
 use crate::meta_models::{TokenStackTrait, TokenTrait};
 use crate::models::Part;
-use crate::part_command::WrappedPartCommand;
+use crate::part_command::{PartCommandParseState, WrappedPartCommand};
 use crate::{
     errors::Pass2Error,
     models::{DivisorClock, NegativePositive, NegativePositiveEqual, NoteCommand},
@@ -46,6 +46,77 @@ impl PartCommandStruct for Note {
     fn to_variant(self) -> PartCommand {
         PartCommand::Note(self)
     }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        command.len() == 1 && "cdefgab".contains(command)
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        match c {
+            '=' => {
+                // natural, optional
+                if working.state > 1 {
+                    panic!("Note: unexpected {c}");
+                }
+
+                working.eat(c);
+                working.jump(1);
+                working.push();
+            }
+            '+' | '-' => {
+                // semitone, optional
+                if working.state > 2 {
+                    panic!("Note: unexptected {c}");
+                }
+
+                working.eat(c);
+                working.jump(2);
+                working.push();
+            }
+            '%' => {
+                if working.state > 4 {
+                    panic!("Note: unexpected {c}");
+                }
+
+                working.eat(c);
+                working.jump(3);
+            }
+            '0'..='9' => {
+                // length, optional
+                if working.state > 4 {
+                    panic!("Note: unexpected {c}");
+                }
+
+                working.eat(c);
+                working.jump(3);
+            }
+            '.' => {
+                // dots, optional
+                if working.state > 5 {
+                    panic!("Note: unexpected {c}");
+                }
+
+                if working.state == 3 {
+                    working.push();
+                }
+
+                working.eat(c);
+                working.jump(4);
+            }
+            _ => {
+                // other command
+                working.push();
+
+                return PartCommandParseState::Parsed;
+            }
+        };
+
+        PartCommandParseState::Parsing
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -58,6 +129,37 @@ pub struct NoteX {
 impl PartCommandStruct for NoteX {
     fn to_variant(self) -> PartCommand {
         PartCommand::NoteX(self)
+    }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        vec!["o", "o+", "o-"].contains(&command)
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        match c {
+            '0'..='9' => {
+                // value
+                if working.state > 2 {
+                    panic!("Octave: unexpected {c}");
+                }
+
+                working.jump(2);
+
+                working.eat(c);
+            }
+            _ => {
+                // other command
+                working.push();
+
+                return PartCommandParseState::Parsed;
+            }
+        }
+
+        PartCommandParseState::Parsing
     }
 }
 
@@ -87,6 +189,18 @@ pub struct NoteR {
 impl PartCommandStruct for NoteR {
     fn to_variant(self) -> PartCommand {
         PartCommand::NoteR(self)
+    }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        command == "r"
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        todo!()
     }
 }
 
@@ -119,6 +233,18 @@ pub struct Portamento {
 impl PartCommandStruct for Portamento {
     fn to_variant(self) -> PartCommand {
         PartCommand::Portamento(self)
+    }
+
+    fn is_block() -> bool {
+        true
+    }
+
+    fn is_match(command: &str) -> bool {
+        todo!()
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        todo!()
     }
 }
 
@@ -176,6 +302,18 @@ impl PartCommandStruct for Octave {
             _ => panic!("PartOctaveChange: unexpected command {}", self.command),
         }
     }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        todo!()
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        todo!()
+    }
 }
 
 impl TryFrom<PartTokenStack> for Octave {
@@ -198,6 +336,18 @@ impl PartCommandStruct for OctaveUp {
     fn to_variant(self) -> PartCommand {
         PartCommand::OctaveUp(self)
     }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        todo!()
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        todo!()
+    }
 }
 
 impl TryFrom<PartTokenStack> for OctaveUp {
@@ -219,6 +369,18 @@ impl PartCommandStruct for OctaveDown {
     fn to_variant(self) -> PartCommand {
         PartCommand::OctaveDown(self)
     }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        todo!()
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        todo!()
+    }
 }
 
 impl TryFrom<PartTokenStack> for OctaveDown {
@@ -239,6 +401,18 @@ pub struct OctaveReverse {
 impl PartCommandStruct for OctaveReverse {
     fn to_variant(self) -> PartCommand {
         PartCommand::OctaveReverse(self)
+    }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        todo!()
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        todo!()
     }
 }
 
@@ -262,6 +436,18 @@ pub struct DefaultLength {
 impl PartCommandStruct for DefaultLength {
     fn to_variant(self) -> PartCommand {
         PartCommand::DefaultLength(self)
+    }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        todo!()
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        todo!()
     }
 }
 
@@ -291,6 +477,18 @@ pub struct ProcessLastLengthUpdate {
 impl PartCommandStruct for ProcessLastLengthUpdate {
     fn to_variant(self) -> PartCommand {
         PartCommand::ProcessLastLengthUpdate(self)
+    }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        todo!()
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        todo!()
     }
 }
 
@@ -330,6 +528,18 @@ impl PartCommandStruct for ProcessLastLengthAddSub {
             }
         }
     }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        todo!()
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        todo!()
+    }
 }
 
 impl TryFrom<PartTokenStack> for ProcessLastLengthAddSub {
@@ -358,6 +568,18 @@ impl PartCommandStruct for ProcessLastLengthMultiply {
     fn to_variant(self) -> PartCommand {
         PartCommand::ProcessLastLengthMultiply(self)
     }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        todo!()
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -370,6 +592,18 @@ pub struct Tie {
 impl PartCommandStruct for Tie {
     fn to_variant(self) -> PartCommand {
         PartCommand::Tie(self)
+    }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        todo!()
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        todo!()
     }
 }
 
@@ -384,6 +618,18 @@ impl PartCommandStruct for Slur {
     fn to_variant(self) -> PartCommand {
         PartCommand::Slur(self)
     }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        todo!()
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -396,6 +642,36 @@ pub struct Quantize1 {
 impl PartCommandStruct for Quantize1 {
     fn to_variant(self) -> PartCommand {
         PartCommand::Quantize1(self)
+    }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        command == "Q"
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        match c {
+            '%' => {
+                working.eat(c);
+                working.push();
+                working.jump(2);
+            }
+            '0'..='9' => {
+                working.eat(c);
+                working.jump(3);
+            }
+            _ => {
+                // other command
+                working.push();
+
+                return PartCommandParseState::Parsed;
+            }
+        }
+
+        PartCommandParseState::Parsing
     }
 }
 
@@ -429,6 +705,65 @@ pub struct Quantize2 {
 impl PartCommandStruct for Quantize2 {
     fn to_variant(self) -> PartCommand {
         PartCommand::Quantize2(self)
+    }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        command == "q"
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        match c {
+            '-' => {
+                if !(working.state == 1 || working.state == 3) {
+                    panic!("q: unexpected -");
+                }
+
+                working.eat(c);
+                working.push();
+                working.next();
+            }
+            'l' => {
+                if !(working.state == 0 || working.state == 4 || working.state == 7) {
+                    panic!("q: unexpected l");
+                }
+
+                working.eat(c);
+                working.push();
+                working.next();
+            }
+            '0'..='9' => {
+                working.eat(c);
+            }
+            '.' => {
+                // dots, optional
+                if working.state == 2 || working.state == 8 {
+                    working.push();
+                }
+
+                working.eat(c);
+                match working.state {
+                    2 => working.jump(4),
+                    8 => working.jump(10),
+                    _ => panic!("q: unexpected dot"),
+                };
+            }
+            ',' => {
+                working.push();
+                working.next();
+            }
+            _ => {
+                // other command
+                working.push();
+
+                return PartCommandParseState::Parsed;
+            }
+        }
+
+        PartCommandParseState::Parsing
     }
 }
 
@@ -551,6 +886,48 @@ impl PartCommandStruct for TemporaryTranspose {
             _ => panic!("ConvertPartCommand: unexpected command {}", self.command),
         }
     }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        vec!["_", "__"].contains(&command)
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        match c {
+            '+' | '-' => {
+                // semitone, optional
+                if working.state > 1 {
+                    panic!("Absolute Transpose: unexpected {c}");
+                }
+
+                working.jump(2);
+
+                working.eat(c);
+                working.push();
+            }
+            '0'..='9' => {
+                // value
+                if working.state > 3 {
+                    panic!("Absolute Transpose: unexpected {c}");
+                }
+
+                working.jump(3);
+
+                working.eat(c);
+            }
+            _ => {
+                // other command
+                working.push();
+
+                return PartCommandParseState::Parsed;
+            }
+        }
+
+        PartCommandParseState::Parsing
+    }
 }
 
 impl TryFrom<PartTokenStack> for TemporaryTranspose {
@@ -581,6 +958,59 @@ pub struct PartTranspose {
 impl PartCommandStruct for PartTranspose {
     fn to_variant(self) -> PartCommand {
         PartCommand::PartTranspose(self)
+    }
+
+    fn is_block() -> bool {
+        true
+    }
+
+    fn is_match(command: &str) -> bool {
+        command == "_{"
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        match c {
+            '+' | '-' | '=' => {
+                // semitone|natural, optional
+                if working.state > 2 {
+                    panic!("Part Transpose: unexpected {c}");
+                }
+
+                working.jump(2);
+
+                working.eat(c);
+                working.push();
+
+                working.jump(3);
+
+                // println!("saving:");
+                // println!("* token: {:?}", working.token);
+                // println!("* tokens: {:?}", working.tokens);
+                // println!("* tokens_stack: {:?}", working.tokens_stack);
+                // println!("* pc_stack: {:?}", working.part_command_stack);
+
+                working.switch_push_to_stack();
+                working.part_command_stack.init_vec();
+                working.save_to_stack();
+            }
+            '}' => {
+                if working.state <= 2 {
+                    panic!("Part Transpose: unexpecetd {c}");
+                }
+
+                // working.eat(c);
+                working.push();
+            }
+            _ => {
+                if working.state != 3 {
+                    panic!("Part Transpose: unexpected {c}");
+                }
+
+                return PartCommandParseState::Parsed;
+            }
+        }
+
+        PartCommandParseState::Parsing
     }
 }
 
@@ -621,6 +1051,47 @@ pub struct MasterTranspose {
 impl PartCommandStruct for MasterTranspose {
     fn to_variant(self) -> PartCommand {
         PartCommand::MasterTranspose(self)
+    }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        command == "_M"
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        match c {
+            '+' | '-' => {
+                // semitone, optional
+                if working.state > 1 {
+                    panic!("Master Transpose: unexpected {c}");
+                }
+
+                working.jump(2);
+
+                working.eat(c);
+                working.push();
+            }
+            '0'..='9' => {
+                // value
+                if working.state > 3 {
+                    panic!("Master Transpose: unexpected {c}");
+                }
+
+                working.eat(c);
+                working.jump(3);
+            }
+            _ => {
+                // other command
+                working.push();
+
+                return PartCommandParseState::Parsed;
+            }
+        }
+
+        PartCommandParseState::Parsing
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::{
     errors::Pass2Error,
-    part_command::{PartCommand, PartCommandStruct, PartTokenStack},
+    part_command::{PartCommand, PartCommandParseState, PartCommandStruct, PartTokenStack},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,6 +22,30 @@ impl PartCommandStruct for Volume {
                 panic!("unexpected command: {}", self.command);
             }
         }
+    }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        vec!["v", "V", "v+", "v-", "v)", "v("].contains(&command)
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        match c {
+            '0'..='9' => {
+                working.eat(c);
+                working.jump(2);
+            }
+            _ => {
+                // other command
+                working.push();
+
+                return PartCommandParseState::Parsed;
+            }
+        }
+        PartCommandParseState::Parsing
     }
 }
 

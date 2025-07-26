@@ -1,6 +1,8 @@
 use crate::{
     errors::Pass2Error,
-    part_command::{PartCommand, PartCommandStruct, PartTokenStack, WrappedPartCommand},
+    part_command::{
+        PartCommand, PartCommandParseState, PartCommandStruct, PartTokenStack, WrappedPartCommand,
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,6 +18,51 @@ pub struct LocalLoop {
 impl PartCommandStruct for LocalLoop {
     fn to_variant(self) -> PartCommand {
         PartCommand::LocalLoop(self)
+    }
+
+    fn is_block() -> bool {
+        true
+    }
+
+    fn is_match(command: &str) -> bool {
+        "[" == command
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        match c {
+            '0'..='9' => {
+                if working.state < 5 {
+                    panic!("LocalLoop: unexpected {c}");
+                }
+
+                if working.state == 5 {
+                    //
+                }
+
+                working.eat(c);
+                working.jump(6);
+            }
+            ']' => {
+                if working.state != 5 {
+                    panic!("LocalLoop: unexpected {c}");
+                }
+
+                working.push();
+                working.jump(6);
+            }
+            _ => {
+                if working.state != 6 {
+                    panic!("LocalLoop: unexpected {c}");
+                }
+
+                // other command
+                working.push();
+
+                return PartCommandParseState::Parsed;
+            }
+        }
+
+        PartCommandParseState::Parsing
     }
 }
 

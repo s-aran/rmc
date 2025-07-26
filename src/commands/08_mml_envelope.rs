@@ -1,6 +1,8 @@
 use crate::{
     errors::Pass2Error,
-    part_command::{PartCommand, PartCommandStruct, PartTokenStack, to_some_i8},
+    part_command::{
+        PartCommand, PartCommandParseState, PartCommandStruct, PartTokenStack, to_some_i8,
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +19,44 @@ pub struct SsgPcmSoftwareEnvelope {
 impl PartCommandStruct for SsgPcmSoftwareEnvelope {
     fn to_variant(self) -> PartCommand {
         PartCommand::SsgPcmSoftwareEnvelope(self)
+    }
+
+    fn is_block() -> bool {
+        false
+    }
+
+    fn is_match(command: &str) -> bool {
+        command == "E"
+    }
+
+    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        match c {
+            '0'..='9' => {
+                if working.state == 2 {
+                    // sign is not specified
+                    working.next();
+                }
+
+                working.eat(c);
+            }
+            ',' => {
+                working.push();
+                working.next();
+            }
+            '+' | '-' => {
+                working.eat(c);
+                working.push();
+                working.next();
+            }
+            _ => {
+                // other command
+                working.push();
+
+                return PartCommandParseState::Parsed;
+            }
+        }
+
+        PartCommandParseState::Parsing
     }
 }
 
