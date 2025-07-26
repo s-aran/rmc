@@ -12,7 +12,7 @@ use crate::{
         },
         commands_volume::Volume,
     },
-    meta_models::{Code, MetaData, Token, TokenStackTrait, TokenTrait},
+    meta_models::{Code, MetaData, Pass2Working, Token, TokenStackTrait, TokenTrait},
     models::{DivisorClock, NegativePositive},
     utils::get_type_name,
 };
@@ -287,8 +287,18 @@ impl PartTokenStack {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) enum PartCommandParseState {
+    Parsing,
+    Parsed,
+}
+
 pub trait PartCommandStruct: std::fmt::Debug {
     fn to_variant(self) -> PartCommand;
+
+    fn is_block() -> bool;
+    fn is_match(command: &str) -> bool;
+    fn parse(working: &mut Pass2Working, c: char) -> PartCommandParseState;
 }
 
 #[derive(Default, Debug, Clone)]

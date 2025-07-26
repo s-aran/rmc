@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::{f32::consts::E, str::FromStr, sync::Arc};
 
 use crate::{
     commands::{
@@ -15,7 +15,10 @@ use crate::{
         Code, Command, Pass1Result, Pass2Result, Pass2Working, TokenStackTrait, TokenTrait,
     },
     models::PartSymbol,
-    part_command::{PartCommand, PartCommandStruct, PartToken, PartTokenStack, WrappedPartCommand},
+    part_command::{
+        PartCommand, PartCommandParseState, PartCommandStruct, PartToken, PartTokenStack,
+        WrappedPartCommand,
+    },
     utils::{ParseUtil, get_type_name, is_n, is_sep},
 };
 
@@ -204,7 +207,7 @@ impl Pass2 {
 
             let t = working.token.chars().as_str();
             match t {
-                "c" | "d" | "e" | "f" | "g" | "a" | "b" => {
+                "c" | "d" | "e" | "f" | "g" | "a" | "b" | "E" | "V" | "q" | "Q" => {
                     working.push();
                     working.jump(1);
                     return Ok(PartCommand::Nop);
@@ -309,11 +312,6 @@ impl Pass2 {
                     working.state_stack.push(working.state);
                     return Ok(PartCommand::Nop);
                 }
-                "E" => {
-                    working.push();
-                    working.jump(1);
-                    return Ok(PartCommand::Nop);
-                }
                 "v" => {
                     if working.state <= 0 {
                         working.jump(1);
@@ -332,21 +330,6 @@ impl Pass2 {
                         }
                     }
                 }
-                "V" => {
-                    working.push();
-                    working.jump(1);
-                    return Ok(PartCommand::Nop);
-                }
-                "q" => {
-                    working.push();
-                    working.jump(1);
-                    return Ok(PartCommand::Nop);
-                }
-                "Q" => {
-                    working.push();
-                    working.jump(1);
-                    return Ok(PartCommand::Nop);
-                }
                 _ => {
                     panic!("unknwon command: {c}");
                 }
@@ -354,383 +337,48 @@ impl Pass2 {
         }
 
         // println!("tokens ==> {:?} // c={c}", working.tokens);
-        match working.tokens.first().unwrap().chars().as_str() {
+        let first_token = working.tokens.first().unwrap().chars().as_str();
+        match first_token {
             "c" | "d" | "e" | "f" | "g" | "a" | "b" => {
-                match c {
-                    '=' => {
-                        // natural, optional
-                        if working.state > 1 {
-                            panic!("Note: unexpected {c}");
-                        }
-
-                        working.eat(c);
-                        working.jump(1);
-                        working.push();
-                    }
-                    '+' | '-' => {
-                        // semitone, optional
-                        if working.state > 2 {
-                            panic!("Note: unexptected {c}");
-                        }
-
-                        working.eat(c);
-                        working.jump(2);
-                        working.push();
-                    }
-                    '%' => {
-                        if working.state > 4 {
-                            panic!("Note: unexpected {c}");
-                        }
-
-                        working.eat(c);
-                        working.jump(3);
-                    }
-                    '0'..='9' => {
-                        // length, optional
-                        if working.state > 4 {
-                            panic!("Note: unexpected {c}");
-                        }
-
-                        working.eat(c);
-                        working.jump(3);
-                    }
-                    '.' => {
-                        // dots, optional
-                        if working.state > 5 {
-                            panic!("Note: unexpected {c}");
-                        }
-
-                        if working.state == 3 {
-                            working.push();
-                        }
-
-                        working.eat(c);
-                        working.jump(4);
-                    }
-                    _ => {
-                        // other command
-                        working.push();
-
-                        Self::push_part_command::<Note>(working);
-
-                        // retry
-                        return self.parse_part_command(working, c);
-                    }
-                };
+                self.__parse_part_command::<Note>(working, c)
             }
-            "o" | "o+" | "o-" => {
-                match c {
-                    '0'..='9' => {
-                        // value
-                        if working.state > 2 {
-                            panic!("Octave: unexpected {c}");
-                        }
-
-                        working.jump(2);
-
-                        working.eat(c);
-                    }
-                    _ => {
-                        // other command
-                        working.push();
-
-                        Self::push_part_command::<Octave>(working);
-
-                        working.clear();
-
-                        // retry
-                        return self.parse_part_command(working, c);
-                    }
-                }
-            }
-            "_" | "__" => {
-                match c {
-                    '+' | '-' => {
-                        // semitone, optional
-                        if working.state > 1 {
-                            panic!("Absolute Transpose: unexpected {c}");
-                        }
-
-                        working.jump(2);
-
-                        working.eat(c);
-                        working.push();
-                    }
-                    '0'..='9' => {
-                        // value
-                        if working.state > 3 {
-                            panic!("Absolute Transpose: unexpected {c}");
-                        }
-
-                        working.jump(3);
-
-                        working.eat(c);
-                    }
-                    _ => {
-                        // other command
-                        working.push();
-
-                        Self::push_part_command::<TemporaryTranspose>(working);
-
-                        working.clear();
-
-                        // retry
-                        return self.parse_part_command(working, c);
-                    }
-                }
-            }
-            "_{" => {
-                match c {
-                    '+' | '-' | '=' => {
-                        // semitone|natural, optional
-                        if working.state > 2 {
-                            panic!("Part Transpose: unexpected {c}");
-                        }
-
-                        working.jump(2);
-
-                        working.eat(c);
-                        working.push();
-
-                        working.jump(3);
-
-                        // println!("saving:");
-                        // println!("* token: {:?}", working.token);
-                        // println!("* tokens: {:?}", working.tokens);
-                        // println!("* tokens_stack: {:?}", working.tokens_stack);
-                        // println!("* pc_stack: {:?}", working.part_command_stack);
-
-                        working.switch_push_to_stack();
-                        working.part_command_stack.init_vec();
-                        working.save_to_stack();
-                    }
-                    '}' => {
-                        if working.state <= 2 {
-                            panic!("Part Transpose: unexpecetd {c}");
-                        }
-
-                        // working.eat(c);
-                        working.push();
-                    }
-                    _ => {
-                        if working.state != 3 {
-                            panic!("Part Transpose: unexpected {c}");
-                        }
-
-                        // other command
-                        // let pops = working.part_command_stack.stack().len();
-                        let pops = 1;
-                        Self::push_block_part_command::<PartTranspose>(working, pops);
-
-                        // retry
-                        return self.parse_part_command(working, c);
-                    }
-                }
-            }
-            "_M" => {
-                match c {
-                    '+' | '-' => {
-                        // semitone, optional
-                        if working.state > 1 {
-                            panic!("Master Transpose: unexpected {c}");
-                        }
-
-                        working.jump(2);
-
-                        working.eat(c);
-                        working.push();
-                    }
-                    '0'..='9' => {
-                        // value
-                        if working.state > 3 {
-                            panic!("Master Transpose: unexpected {c}");
-                        }
-
-                        working.eat(c);
-                        working.jump(3);
-                    }
-                    _ => {
-                        // other command
-                        working.push();
-
-                        Self::push_part_command::<MasterTranspose>(working);
-
-                        // retry
-                        return self.parse_part_command(working, c);
-                    }
-                }
-            }
-            "[" => {
-                match c {
-                    '0'..='9' => {
-                        if working.state < 5 {
-                            panic!("LocalLoop: unexpected {c}");
-                        }
-
-                        if working.state == 5 {
-                            //
-                        }
-
-                        working.eat(c);
-                        working.jump(6);
-                    }
-                    ']' => {
-                        if working.state != 5 {
-                            panic!("LocalLoop: unexpected {c}");
-                        }
-
-                        working.push();
-                        working.jump(6);
-                    }
-                    _ => {
-                        if working.state != 6 {
-                            panic!("LocalLoop: unexpected {c}");
-                        }
-
-                        // other command
-                        working.push();
-
-                        // let pops = working.part_command_stack.stack().len();
-                        let pops = if let Some(v) = working.tokens.get(2)
-                            && v.chars() == ":"
-                        {
-                            2
-                        } else {
-                            1
-                        };
-                        Self::push_block_part_command::<LocalLoop>(working, pops);
-
-                        // retry
-                        return self.parse_part_command(working, c);
-                    }
-                }
-            }
-            "E" => {
-                match c {
-                    '0'..='9' => {
-                        if working.state == 2 {
-                            // sign is not specified
-                            working.next();
-                        }
-
-                        working.eat(c);
-                    }
-                    ',' => {
-                        working.push();
-                        working.next();
-                    }
-                    '+' | '-' => {
-                        working.eat(c);
-                        working.push();
-                        working.next();
-                    }
-                    _ => {
-                        // other command
-                        working.push();
-
-                        Self::push_part_command::<SsgPcmSoftwareEnvelope>(working);
-
-                        // retry
-                        return self.parse_part_command(working, c);
-                    }
-                }
-            }
+            "o" | "o+" | "o-" => self.__parse_part_command::<Octave>(working, c),
+            "_{" => self.__parse_part_command::<PartTranspose>(working, c),
+            "_" | "__" => self.__parse_part_command::<TemporaryTranspose>(working, c),
+            "_M" => self.__parse_part_command::<MasterTranspose>(working, c),
+            "[" => self.__parse_part_command::<LocalLoop>(working, c),
+            "E" => self.__parse_part_command::<SsgPcmSoftwareEnvelope>(working, c),
             "v" | "V" | "v+" | "v-" | "v)" | "v(" => {
-                match c {
-                    '0'..='9' => {
-                        working.eat(c);
-                        working.jump(2);
-                    }
-                    _ => {
-                        // other command
-                        working.push();
-
-                        Self::push_part_command::<Volume>(working);
-
-                        // retry
-                        return self.parse_part_command(working, c);
-                    }
-                }
+                self.__parse_part_command::<Volume>(working, c)
             }
-            "Q" => {
-                match c {
-                    '%' => {
-                        working.eat(c);
-                        working.push();
-                        working.jump(2);
-                    }
-                    '0'..='9' => {
-                        working.eat(c);
-                        working.jump(3);
-                    }
-                    _ => {
-                        // other command
-                        working.push();
-
-                        Self::push_part_command::<Quantize1>(working);
-
-                        // retry
-                        return self.parse_part_command(working, c);
-                    }
-                }
-            }
-            "q" => {
-                match c {
-                    '-' => {
-                        if !(working.state == 1 || working.state == 3) {
-                            panic!("q: unexpected -");
-                        }
-
-                        working.eat(c);
-                        working.push();
-                        working.next();
-                    }
-                    'l' => {
-                        if !(working.state == 0 || working.state == 4 || working.state == 7) {
-                            panic!("q: unexpected l");
-                        }
-
-                        working.eat(c);
-                        working.push();
-                        working.next();
-                    }
-                    '0'..='9' => {
-                        working.eat(c);
-                    }
-                    '.' => {
-                        // dots, optional
-                        if working.state == 2 || working.state == 8 {
-                            working.push();
-                        }
-
-                        working.eat(c);
-                        match working.state {
-                            2 => working.jump(4),
-                            8 => working.jump(10),
-                            _ => panic!("q: unexpected dot"),
-                        };
-                    }
-                    ',' => {
-                        working.push();
-                        working.next();
-                    }
-                    _ => {
-                        // other command
-                        working.push();
-
-                        Self::push_part_command::<Quantize2>(working);
-
-                        // retry
-                        return self.parse_part_command(working, c);
-                    }
-                }
-            }
+            "Q" => self.__parse_part_command::<Quantize1>(working, c),
+            "q" => self.__parse_part_command::<Quantize2>(working, c),
             _ => {
-                //
+                panic!("unknown command: {first_token}");
             }
         }
+    }
 
-        Ok(PartCommand::Nop)
+    fn __parse_part_command<T>(
+        &self,
+        working: &mut Pass2Working,
+        c: char,
+    ) -> Result<PartCommand, Pass2Error>
+    where
+        T: TryFrom<PartTokenStack, Error = Pass2Error> + PartCommandStruct,
+    {
+        if T::parse(working, c) == PartCommandParseState::Parsed {
+            if T::is_block() {
+                Self::push_block_part_command::<T>(working);
+            } else {
+                Self::push_part_command::<T>(working);
+            }
+
+            // retry
+            return self.parse_part_command(working, c);
+        }
+
+        return Ok(PartCommand::Nop);
     }
 
     fn push_part_command<T>(working: &mut Pass2Working)
@@ -761,7 +409,7 @@ impl Pass2 {
         working.clear();
     }
 
-    fn push_block_part_command<T>(working: &mut Pass2Working, pops: usize)
+    fn push_block_part_command<T>(working: &mut Pass2Working)
     where
         T: TryFrom<PartTokenStack, Error = Pass2Error> + PartCommandStruct,
     {
