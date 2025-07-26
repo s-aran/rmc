@@ -1,8 +1,10 @@
 use crate::{
     errors::Pass1Error,
-    meta_models::{Code, Command, Pass1Result, Token, TokenStack, VariantValue},
+    meta_models::{
+        Code, Command, Pass1Result, Token, TokenStack, TokenStackTrait, TokenTrait, VariantValue,
+    },
     models::{Comment1, Comment2, FmToneDefine, Macro, Variable},
-    utils::{ParseUtil, is_n, is_sep, split},
+    utils::{ParseUtil, is_n, is_sep},
 };
 
 pub struct Pass1 {

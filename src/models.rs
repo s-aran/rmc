@@ -1,9 +1,11 @@
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
 use strum::VariantNames;
 
 use crate::{
-    meta_models::{Code, FileName, Pass1Result, Token, TokenStack, VariantValue},
+    errors::Pass2Error,
+    meta_models::{Code, FileName, Token, TokenStack, TokenStackTrait, TokenTrait, VariantValue},
+    part_command::{PartToken, WrappedPartCommand},
     utils::is_sep,
 };
 
@@ -96,6 +98,72 @@ impl From<&str> for RelativeAbsolute8 {
         } else {
             let value = value.parse::<u8>().unwrap();
             RelativeAbsolute8::Absolute(value)
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, strum::EnumString)]
+pub enum NegativePositive {
+    #[strum(serialize = "-")]
+    Negative,
+    #[strum(serialize = "+")]
+    Positive,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, strum::EnumString)]
+pub enum NegativePositiveEqual {
+    #[strum(serialize = "-")]
+    Negative,
+    #[strum(serialize = "+")]
+    Positive,
+    #[strum(serialize = "=")]
+    Equal,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DivisorClock<T> {
+    Divisor(T),
+    Clock(T),
+}
+
+impl TryFrom<Vec<PartToken>> for DivisorClock<u8> {
+    type Error = Pass2Error;
+
+    fn try_from(value: Vec<PartToken>) -> Result<Self, Self::Error> {
+        if value.len() <= 0 {
+            panic!("stack has no items");
+        }
+
+        if value.len() > 2 {
+            panic!("too many items: {} items", value.len());
+        }
+
+        if value.len() == 1 {
+            match value[0].token().parse::<u8>() {
+                Ok(v) => return Ok(DivisorClock::Divisor(v)),
+                Err(e) => {
+                    panic!("{}", e);
+                }
+            }
+        }
+
+        if value[0].get_state() != value[1].get_state() {
+            panic!(
+                "contains another number: {}, {}",
+                value[0].get_state(),
+                value[1].get_state()
+            );
+        }
+
+        if value[0].token() != "%" {
+            panic!("unexpected token: {}", value[0].token());
+        }
+
+        match value[1].token().parse::<u8>() {
+            Ok(v) => Ok(DivisorClock::Clock(v)),
+            Err(e) => {
+                panic!("{}", e);
+            }
         }
     }
 }
@@ -1398,6 +1466,42 @@ impl From<Macro> for TransposeMacro {
 
         panic!("Transpose");
     }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, strum::EnumString)]
+#[allow(non_camel_case_types)]
+pub enum NoteCommand {
+    c,
+    d,
+    e,
+    f,
+    g,
+    a,
+    b,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, strum::EnumString)]
+#[allow(non_camel_case_types)]
+pub enum NoteOctaveCommand {
+    c,
+    d,
+    e,
+    f,
+    g,
+    a,
+    b,
+    o,
+    x,
+    #[strum(serialize = ">")]
+    OctaveUp,
+    #[strum(serialize = "<")]
+    OctaveDown,
+}
+
+#[derive(Debug, Clone)]
+pub struct Part {
+    code: Code,
+    commands: Vec<WrappedPartCommand>,
 }
 
 #[cfg(test)]

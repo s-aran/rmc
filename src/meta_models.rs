@@ -1,9 +1,8 @@
-use std::collections::{HashMap, HashSet};
-
 use crate::models::{
-    Comment1, Comment2, ExtendNormalOption, ExtendPartSymbol, FmToneDefine, Macro, OnOffOption,
-    PartSymbol, ReverseNormalOption, Variable,
+    Comment1, Comment2, ExtendNormalOption, FmToneDefine, Macro, OnOffOption, PartSymbol,
+    ReverseNormalOption, Variable,
 };
+use crate::part_command::{PartCommandStack, PartToken, PartTokenStack, State, WrappedPartCommand};
 
 pub type FileName = String;
 pub type LineNumber = usize;
@@ -30,11 +29,106 @@ impl Code {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MetaData<T>
+where
+    T: std::fmt::Debug + Clone + PartialEq + Eq,
+{
+    code: Code,
+    data: T,
+}
+
+impl<T> MetaData<T>
+where
+    T: std::fmt::Debug + Clone + PartialEq + Eq,
+{
+    pub fn new(code: &Code, data: T) -> Self {
+        Self {
+            code: code.clone(),
+            data,
+        }
+    }
+
+    pub fn code(&self) -> &Code {
+        &self.code
+    }
+
+    pub fn data(&self) -> &T {
+        &self.data
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Token {
     pub begin: usize,
     pub end: usize,
     pub chars: String,
+}
+
+pub(crate) trait TokenTrait {
+    fn eat(&mut self, c: char) {
+        self.chars_mut().push(c);
+        *self.end_mut() += 1;
+    }
+
+    fn clear(&mut self) {
+        *self.begin_mut() = *self.end();
+        self.chars_mut().clear();
+    }
+
+    fn chars(&self) -> &String;
+    fn chars_mut(&mut self) -> &mut String;
+
+    fn begin(&self) -> &usize;
+    fn begin_mut(&mut self) -> &mut usize;
+    fn end(&self) -> &usize;
+    fn end_mut(&mut self) -> &mut usize;
+
+    fn len(&self) -> usize {
+        self.end() - self.begin()
+    }
+
+    fn range(&self) -> std::ops::Range<usize> {
+        *self.begin()..*self.end()
+    }
+
+    fn skip(&mut self) {
+        *self.begin_mut() += 1;
+    }
+
+    fn token(&self) -> String {
+        self.chars().to_owned()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.begin() == self.end()
+    }
+}
+
+impl TokenTrait for Token {
+    fn chars(&self) -> &String {
+        &self.chars
+    }
+
+    fn chars_mut(&mut self) -> &mut String {
+        &mut self.chars
+    }
+
+    fn begin(&self) -> &usize {
+        &self.begin
+    }
+
+    fn begin_mut(&mut self) -> &mut usize {
+        &mut self.begin
+    }
+
+    fn end(&self) -> &usize {
+        &self.end
+    }
+
+    fn end_mut(&mut self) -> &mut usize {
+        &mut self.end
+    }
 }
 
 impl Token {
@@ -45,72 +139,52 @@ impl Token {
             chars: String::new(),
         }
     }
+}
 
-    pub fn eat(&mut self, c: char) {
-        self.chars.push(c);
-        self.end += 1;
+#[derive(Debug, Clone, Default)]
+pub struct TokenStack {
+    stack: Vec<Token>,
+}
+
+impl TokenStackTrait<Token> for TokenStack {
+    fn stack(&self) -> &Vec<Token> {
+        &self.stack
     }
 
-    pub fn skip(&mut self) {
-        self.begin += 1;
-    }
-
-    pub fn token(&self) -> String {
-        self.chars.to_owned()
-    }
-
-    pub fn begin(&self) -> usize {
-        self.begin
-    }
-
-    pub fn end(&self) -> usize {
-        self.end
-    }
-
-    pub fn len(&self) -> usize {
-        self.end - self.begin
-    }
-
-    pub fn range(&self) -> std::ops::Range<usize> {
-        self.begin..self.end
-    }
-
-    pub fn clear(&mut self) {
-        self.begin = self.end;
-        self.chars.clear();
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.begin == self.end
+    fn stack_mut(&mut self) -> &mut Vec<Token> {
+        &mut self.stack
     }
 }
 
-#[derive(Debug)]
-pub struct TokenStack {
-    stack: Vec<Token>,
+pub(crate) trait TokenStackTrait<T>
+where
+    T: Clone + TokenTrait,
+{
+    fn stack(&self) -> &Vec<T>;
+    fn stack_mut(&mut self) -> &mut Vec<T>;
+
+    fn push(&mut self, token: &T) {
+        if !token.is_empty() {
+            self.stack_mut().push(token.clone());
+        }
+    }
+
+    fn pop(&mut self) -> Option<T> {
+        self.stack_mut().pop()
+    }
+
+    fn len(&self) -> usize {
+        self.stack().len()
+    }
+
+    fn clear(&mut self) {
+        self.stack_mut().clear();
+    }
 }
 
 impl TokenStack {
     pub fn new() -> Self {
         Self { stack: Vec::new() }
-    }
-
-    pub fn push(&mut self, token: &Token) {
-        if !token.is_empty() {
-            self.stack.push(token.clone());
-        }
-    }
-
-    pub fn pop(&mut self) -> Option<Token> {
-        self.stack.pop()
-    }
-
-    pub fn len(&self) -> usize {
-        self.stack.len()
-    }
-
-    pub fn clear(&mut self) {
-        self.stack.clear();
     }
 }
 
@@ -353,6 +427,9 @@ pub enum Command {
     //     おとなしい場所を選ぶようにすれば、リピートする瞬間のノイズが
     //     軽減されるようですのでお試し下さい。
     FmToneDefine(Code), // @
+
+    Part(Code, PartSymbol),
+
     Unknown(CommandName, CommandParameter, Code),
 }
 
@@ -382,6 +459,80 @@ pub struct Pass1Result {
     pub comment2s: Vec<Comment2>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Pass2Working {
+    pub tokens: PartTokenStack,
+    pub token: PartToken,
+    pub code: Code,
+    pub state: State,
+    pub loop_nest: u8,
+    pub commands: Vec<WrappedPartCommand>,
+
+    pub tokens_stack: Vec<PartTokenStack>,
+    pub state_stack: Vec<State>,
+    pub part_command_stack: PartCommandStack,
+    pub push_to_working_stack: bool,
+}
+
+impl Pass2Working {
+    pub fn eat(&mut self, c: char) {
+        self.token.eat(c);
+    }
+
+    pub fn push(&mut self) {
+        self.token.set_code(&self.code);
+        self.token.set_state(self.state);
+        self.tokens.push(&self.token);
+        self.token.clear();
+    }
+
+    pub fn clear(&mut self) {
+        self.tokens.stack_mut().clear();
+        self.tokens.clear();
+        self.token.clear();
+        self.state = 0;
+    }
+
+    pub fn next(&mut self) {
+        self.jump(self.state + 1);
+    }
+
+    pub fn jump(&mut self, state: State) {
+        self.state = state;
+    }
+
+    pub fn switch_push_to_stack(&mut self) {
+        self.push_to_working_stack = true;
+    }
+
+    pub fn switch_push_to_commands(&mut self) {
+        self.push_to_working_stack = false;
+    }
+
+    pub fn save_to_stack(&mut self) {
+        self.tokens.push(&self.token);
+        self.tokens_stack.push(self.tokens.clone());
+        self.state_stack.push(self.state);
+
+        self.token.clear();
+        self.tokens.clear();
+        self.state = 0;
+    }
+
+    pub fn load_from_stack(&mut self) {
+        self.tokens = if let Some(v) = self.tokens_stack.pop() {
+            v
+        } else {
+            panic!("loadl_from_stack: tokens_stack is empty")
+        };
+
+        // if self.tokens.len() > 1 {
+        //     self.token = self.tokens.pop().unwrap();
+        // }
+        self.state = self.state_stack.pop().unwrap();
+    }
+}
+
 #[derive(Default, Debug, Clone)]
 pub struct Pass2Result {
     pub macros: Vec<Macro>,
@@ -390,5 +541,15 @@ pub struct Pass2Result {
     pub comment1s: Vec<Comment1>,
     pub comment2s: Vec<Comment2>,
 
-    pub parts: HashMap<PartSymbol, Vec<String>>,
+    pub parts: Vec<(PartSymbol, Vec<WrappedPartCommand>)>,
+}
+
+impl Pass2Result {
+    pub fn get_parts(&self, part: &PartSymbol) -> Vec<&Vec<WrappedPartCommand>> {
+        self.parts
+            .iter()
+            .filter(|(s, _)| s == part)
+            .map(|(_, l)| l)
+            .collect::<Vec<&Vec<WrappedPartCommand>>>()
+    }
 }
