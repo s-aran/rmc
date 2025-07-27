@@ -1,10 +1,8 @@
-use crate::meta_models::{TokenStackTrait, TokenTrait};
-use crate::models::Part;
 use crate::part_command::{PartCommandParseState, WrappedPartCommand};
 use crate::utils::get_type_name;
 use crate::{
     errors::Pass2Error,
-    models::{DivisorClock, NegativePositive, NegativePositiveEqual, NoteCommand},
+    models::{DivisorClock, NegativePositive, NegativePositiveEqual},
     part_command::{PartCommand, PartCommandStruct, PartTokenStack, count_dots, make_some_length},
 };
 
@@ -324,7 +322,7 @@ impl PartCommandStruct for Octave {
 
                 return PartCommandParseState::Parsed;
             }
-        };
+        }
 
         PartCommandParseState::Parsing
     }
@@ -341,14 +339,31 @@ impl TryFrom<PartTokenStack> for Octave {
     }
 }
 
+// ===============================================================================
+// §4-5	オクターブアップ・ダウン
+// 	> <
+// -------------------------------------------------------------------------------
+// [書式1]	>
+// [書式2]	<
+// -------------------------------------------------------------------------------
+// [音源]	FM / SSG / PCM
+// -------------------------------------------------------------------------------
+// 	> の場合、オクターブを１つ上げます。
+// 	< の場合、オクターブを１つ下げます。
+//
+// 	X #Octave コマンドで、機能の反転が可能です。
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct OctaveUp {
+pub struct OctaveUpDown {
     pub command: String,
 }
 
-impl PartCommandStruct for OctaveUp {
+impl PartCommandStruct for OctaveUpDown {
     fn to_variant(self) -> PartCommand {
-        PartCommand::OctaveUp(self)
+        match self.command.as_str() {
+            ">" => PartCommand::OctaveUp(self),
+            "<" => PartCommand::OctaveDown(self),
+            _ => panic!("unexpected command: {}", self.command),
+        }
     }
 
     fn is_block() -> bool {
@@ -356,54 +371,34 @@ impl PartCommandStruct for OctaveUp {
     }
 
     fn is_match(command: &str) -> bool {
-        todo!()
+        vec![">", "<"].contains(&command)
     }
 
     fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
-        todo!()
+        match c {
+            '>' | '<' => {
+                working.eat(c);
+                working.jump(1);
+            }
+            _ => {
+                // other command
+                working.push();
+
+                return PartCommandParseState::Parsed;
+            }
+        }
+
+        PartCommandParseState::Parsing
     }
 }
 
-impl TryFrom<PartTokenStack> for OctaveUp {
+impl TryFrom<PartTokenStack> for OctaveUpDown {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
         let command = try_from_get_value!(value.pop_and_cast::<String>(0), value);
 
-        Ok(OctaveUp { command })
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct OctaveDown {
-    pub command: String,
-}
-
-impl PartCommandStruct for OctaveDown {
-    fn to_variant(self) -> PartCommand {
-        PartCommand::OctaveDown(self)
-    }
-
-    fn is_block() -> bool {
-        false
-    }
-
-    fn is_match(command: &str) -> bool {
-        todo!()
-    }
-
-    fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
-        todo!()
-    }
-}
-
-impl TryFrom<PartTokenStack> for OctaveDown {
-    type Error = Pass2Error;
-
-    fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
-        let command = try_from_get_value!(value.pop_and_cast::<String>(0), value);
-
-        Ok(OctaveDown { command })
+        Ok(OctaveUpDown { command })
     }
 }
 
@@ -1036,7 +1031,6 @@ impl PartCommandStruct for PartTranspose {
     }
 
     fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
-        println!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! c:{c}");
         match c {
             '+' | '-' | '=' => {
                 // semitone|natural, optional

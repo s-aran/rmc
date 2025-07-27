@@ -5,11 +5,12 @@ use crate::{
         commands_envelope::SsgPcmSoftwareEnvelope,
         commands_loop::LocalLoop,
         commands_mml::{
-            DefaultLength, MasterTranspose, Note, NoteR, NoteX, Octave, OctaveDown, OctaveReverse,
-            OctaveUp, PartTranspose, Portamento, ProcessLastLengthAddSub,
+            DefaultLength, MasterTranspose, Note, NoteR, NoteX, Octave, OctaveReverse,
+            OctaveUpDown, PartTranspose, Portamento, ProcessLastLengthAddSub,
             ProcessLastLengthMultiply, ProcessLastLengthUpdate, Quantize1, Quantize2, Slur,
             TemporaryTranspose, Tie,
         },
+        commands_note_effect::Alpeggio,
         commands_volume::Volume,
     },
     meta_models::{Code, MetaData, Pass2Working, Token, TokenStackTrait, TokenTrait},
@@ -353,8 +354,8 @@ pub enum PartCommand {
     Portamento(Portamento),
 
     Octave(Octave),
-    OctaveUp(OctaveUp),
-    OctaveDown(OctaveDown),
+    OctaveUp(OctaveUpDown),
+    OctaveDown(OctaveUpDown),
     OctaveReverse(OctaveReverse),
     PartOctaveChangePositive(Octave),
     PartOctaveChangeNegative(Octave),
@@ -386,6 +387,8 @@ pub enum PartCommand {
     GlobalVolume1Negative(Volume),
     GlobalVolume2Positive(Volume),
     GlobalVolume2Negative(Volume),
+
+    Alpeggio(Alpeggio),
 }
 
 pub trait IsPartCommand {}

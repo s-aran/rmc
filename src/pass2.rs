@@ -5,9 +5,10 @@ use crate::{
         commands_envelope::SsgPcmSoftwareEnvelope,
         commands_loop::LocalLoop,
         commands_mml::{
-            DefaultLength, MasterTranspose, Note, Octave, PartTranspose, Portamento, Quantize1,
-            Quantize2, TemporaryTranspose,
+            DefaultLength, MasterTranspose, Note, Octave, OctaveUpDown, PartTranspose, Portamento,
+            Quantize1, Quantize2, TemporaryTranspose,
         },
+        commands_note_effect::Alpeggio,
         commands_volume::Volume,
     },
     errors::Pass2Error,
@@ -207,7 +208,8 @@ impl Pass2 {
 
             let t = working.token.chars().as_str();
             match t {
-                "c" | "d" | "e" | "f" | "g" | "a" | "b" | "q" | "Q" | "l" | "V" | "E" => {
+                "c" | "d" | "e" | "f" | "g" | "a" | "b" | "q" | "Q" | "l" | "<" | ">" | "V"
+                | "E" => {
                     working.push();
                     working.jump(1);
                     return Ok(PartCommand::Nop);
@@ -250,20 +252,20 @@ impl Pass2 {
                         }
                     }
                 }
-                "}" => {
+                "{" => {
                     if working.state <= 0 {
                         working.jump(1);
                         return Ok(PartCommand::Nop);
                     }
 
                     match c {
-                        '}' => {
+                        '{' => {
+                            println!("{{{{");
                             working.eat(c);
                             working.push();
 
-                            working.load_from_stack();
                             working.jump(3);
-                            working.switch_push_to_commands();
+                            Self::quick_save(working);
 
                             return Ok(PartCommand::Nop);
                         }
@@ -272,9 +274,45 @@ impl Pass2 {
                             working.push();
                             let mut tokens = working.tokens.clone();
 
-                            working.load_from_stack();
                             working.jump(3);
-                            working.switch_push_to_commands();
+                            Self::quick_save(working);
+
+                            // push "{"
+                            working.tokens.push(&tokens.pop().unwrap());
+
+                            // fall
+                        }
+                    }
+                }
+                "}" => {
+                    if working.state <= 0 {
+                        working.jump(1);
+                        return Ok(PartCommand::Nop);
+                    }
+
+                    match c {
+                        '}' => {
+                            working.jump(3);
+                            working.eat(c);
+                            working.push();
+
+                            let mut tokens = working.tokens.clone();
+
+                            Self::quick_load(working);
+                            working.jump(4);
+
+                            // push "}}"
+                            working.tokens.push(&tokens.pop().unwrap());
+
+                            return Ok(PartCommand::Nop);
+                        }
+                        _ => {
+                            working.jump(3);
+                            working.push();
+                            let mut tokens = working.tokens.clone();
+
+                            Self::quick_load(working);
+                            working.jump(3);
 
                             // push "}"
                             working.tokens.push(&tokens.pop().unwrap());
@@ -282,12 +320,6 @@ impl Pass2 {
                             // fall
                         }
                     }
-
-                    // println!("loaded:");
-                    // println!("* token: {:?}", working.token);
-                    // println!("* tokens: {:?}", working.tokens);
-                    // println!("* tokens_stack: {:?}", working.tokens_stack);
-                    // println!("* pc_stack: {:?}", working.part_command_stack);
 
                     // fall througbh
                 }
@@ -297,31 +329,15 @@ impl Pass2 {
                     working.push();
                     working.jump(2);
 
-                    // println!("saving:");
-                    // println!("* token: {:?}", working.token);
-                    // println!("* tokens: {:?}", working.tokens);
-                    // println!("* tokens_stack: {:?}", working.tokens_stack);
-                    // println!("* pc_stack: {:?}", working.part_command_stack);
-
-                    working.switch_push_to_stack();
-                    working.part_command_stack.init_vec();
-                    working.save_to_stack();
+                    Self::quick_save(working);
 
                     return Ok(PartCommand::Nop);
                 }
                 "]" => {
-                    // println!("LocalLoop end {c}:");
-
-                    working.load_from_stack();
-                    working.jump(5);
-                    working.switch_push_to_commands();
                     working.loop_nest -= 1;
 
-                    // println!("loaded:");
-                    // println!("* token: {:?}", working.token);
-                    // println!("* tokens: {:?}", working.tokens);
-                    // println!("* tokens_stack: {:?}", working.tokens_stack);
-                    // println!("* pc_stack: {:?}", working.part_command_stack);
+                    Self::quick_load(working);
+                    working.jump(5);
 
                     // fall through
                 }
@@ -377,6 +393,7 @@ impl Pass2 {
             }
             "o" | "o+" | "o-" => self.__parse_part_command::<Octave>(working, c),
             "l" => self.__parse_part_command::<DefaultLength>(working, c),
+            "<" | ">" => self.__parse_part_command::<OctaveUpDown>(working, c),
             "_{" => self.__parse_part_command::<PartTranspose>(working, c),
             "_" | "__" => self.__parse_part_command::<TemporaryTranspose>(working, c),
             "_M" => self.__parse_part_command::<MasterTranspose>(working, c),
@@ -390,10 +407,37 @@ impl Pass2 {
             "E" => self.__parse_part_command::<SsgPcmSoftwareEnvelope>(working, c),
             // 10: mml loop
             "[" => self.__parse_part_command::<LocalLoop>(working, c),
+            // 12: mml note effect
+            "{{" => self.__parse_part_command::<Alpeggio>(working, c),
             _ => {
                 panic!("unknown command: {first_token}");
             }
         }
+    }
+
+    fn quick_save(working: &mut Pass2Working) {
+        println!("saving:");
+        println!("* token: {:?}", working.token);
+        println!("* tokens: {:?}", working.tokens);
+        println!("* tokens_stack: {:?}", working.tokens_stack);
+        println!("* pc_stack: {:?}", working.part_command_stack);
+
+        working.switch_push_to_stack();
+
+        working.part_command_stack.init_vec();
+        working.save_to_stack();
+    }
+
+    fn quick_load(working: &mut Pass2Working) {
+        working.load_from_stack();
+
+        working.switch_push_to_commands();
+
+        println!("loaded:");
+        println!("* token: {:?}", working.token);
+        println!("* tokens: {:?}", working.tokens);
+        println!("* tokens_stack: {:?}", working.tokens_stack);
+        println!("* pc_stack: {:?}", working.part_command_stack);
     }
 
     fn __parse_part_command<T>(
@@ -434,7 +478,6 @@ impl Pass2 {
 
         let w = WrappedPartCommand::new(&code, command.to_variant());
 
-        // println!("{}", working.push_to_working_stack);
         if working.push_to_working_stack {
             println!("==> push to part_command_stack: {:?}", w);
             working.part_command_stack.push_token(w);
