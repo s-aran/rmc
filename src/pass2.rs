@@ -146,6 +146,23 @@ impl Pass2 {
 
                         working.clear();
 
+                        if working.part_command_stack.stack().len() > 0 {
+                            let mut tmp = vec![];
+                            while working.part_command_stack.stack_mut().last().is_some() {
+                                if let Some(s) = working.part_command_stack.stack_mut().pop() {
+                                    tmp.push(s);
+                                } else {
+                                    break;
+                                }
+                            }
+
+                            while tmp.last().is_some() {
+                                if let Some(s) = tmp.pop() {
+                                    working.commands.extend(s);
+                                }
+                            }
+                        }
+
                         result.parts.push((part.clone(), working.commands.clone()));
                         println!("result.parts: {:?}", result.parts);
                     }
@@ -180,6 +197,8 @@ impl Pass2 {
                 command = Command::Nop;
             }
         }
+
+        println!("Result: {:?}", working.commands);
 
         Ok(result)
     }
@@ -478,13 +497,18 @@ impl Pass2 {
 
         let w = WrappedPartCommand::new(&code, command.to_variant());
 
-        if working.push_to_working_stack {
-            println!("==> push to part_command_stack: {:?}", w);
-            working.part_command_stack.push_token(w);
-        } else {
-            println!("==> push commands: {:?}", w);
-            working.commands.push(w);
+        // if working.push_to_working_stack {
+        //     println!("==> push to part_command_stack: {:?}", w);
+        //     working.part_command_stack.push_token(w);
+        // } else {
+        //     println!("==> push commands: {:?}", w);
+        //     working.commands.push(w);
+        // }
+
+        if working.part_command_stack.stack().len() <= 0 {
+            working.part_command_stack.init_vec();
         }
+        working.part_command_stack.push_token(w);
 
         working.clear();
     }
