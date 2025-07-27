@@ -5,8 +5,8 @@ use crate::{
         commands_envelope::SsgPcmSoftwareEnvelope,
         commands_loop::LocalLoop,
         commands_mml::{
-            MasterTranspose, Note, Octave, PartTranspose, Portamento, Quantize1, Quantize2,
-            TemporaryTranspose,
+            DefaultLength, MasterTranspose, Note, Octave, PartTranspose, Portamento, Quantize1,
+            Quantize2, TemporaryTranspose,
         },
         commands_volume::Volume,
     },
@@ -207,11 +207,12 @@ impl Pass2 {
 
             let t = working.token.chars().as_str();
             match t {
-                "c" | "d" | "e" | "f" | "g" | "a" | "b" | "E" | "V" | "q" | "Q" => {
+                "c" | "d" | "e" | "f" | "g" | "a" | "b" | "q" | "Q" | "l" | "V" | "E" => {
                     working.push();
                     working.jump(1);
                     return Ok(PartCommand::Nop);
                 }
+                // complex commands
                 "o" => {
                     if working.state <= 0 {
                         working.jump(1);
@@ -250,9 +251,37 @@ impl Pass2 {
                     }
                 }
                 "}" => {
-                    working.load_from_stack();
-                    working.jump(3);
-                    working.switch_push_to_commands();
+                    if working.state <= 0 {
+                        working.jump(1);
+                        return Ok(PartCommand::Nop);
+                    }
+
+                    match c {
+                        '}' => {
+                            working.eat(c);
+                            working.push();
+
+                            working.load_from_stack();
+                            working.jump(3);
+                            working.switch_push_to_commands();
+
+                            return Ok(PartCommand::Nop);
+                        }
+                        _ => {
+                            working.jump(3);
+                            working.push();
+                            let mut tokens = working.tokens.clone();
+
+                            working.load_from_stack();
+                            working.jump(3);
+                            working.switch_push_to_commands();
+
+                            // push "}"
+                            working.tokens.push(&tokens.pop().unwrap());
+
+                            // fall
+                        }
+                    }
 
                     // println!("loaded:");
                     // println!("* token: {:?}", working.token);
@@ -336,23 +365,31 @@ impl Pass2 {
             }
         }
 
-        // println!("tokens ==> {:?} // c={c}", working.tokens);
         let first_token = working.tokens.first().unwrap().chars().as_str();
+        println!(
+            "tokens ==> {:?} // first={first_token} // c={c}",
+            working.tokens
+        );
         match first_token {
+            // 04: mml note
             "c" | "d" | "e" | "f" | "g" | "a" | "b" => {
                 self.__parse_part_command::<Note>(working, c)
             }
             "o" | "o+" | "o-" => self.__parse_part_command::<Octave>(working, c),
+            "l" => self.__parse_part_command::<DefaultLength>(working, c),
             "_{" => self.__parse_part_command::<PartTranspose>(working, c),
             "_" | "__" => self.__parse_part_command::<TemporaryTranspose>(working, c),
             "_M" => self.__parse_part_command::<MasterTranspose>(working, c),
-            "[" => self.__parse_part_command::<LocalLoop>(working, c),
-            "E" => self.__parse_part_command::<SsgPcmSoftwareEnvelope>(working, c),
+            "Q" => self.__parse_part_command::<Quantize1>(working, c),
+            "q" => self.__parse_part_command::<Quantize2>(working, c),
+            // 05: mml volume
             "v" | "V" | "v+" | "v-" | "v)" | "v(" => {
                 self.__parse_part_command::<Volume>(working, c)
             }
-            "Q" => self.__parse_part_command::<Quantize1>(working, c),
-            "q" => self.__parse_part_command::<Quantize2>(working, c),
+            // 08: mml envelope
+            "E" => self.__parse_part_command::<SsgPcmSoftwareEnvelope>(working, c),
+            // 10: mml loop
+            "[" => self.__parse_part_command::<LocalLoop>(working, c),
             _ => {
                 panic!("unknown command: {first_token}");
             }
@@ -747,7 +784,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_2() {
         let mml = r#";{{ 音階1 [音階2 …音階16まで] }} [音長] [ ,1音の長さ(def=%1) [ ,タイon(1,def)/off(0)
 ;				         [ ,gate(def=0) [ ,1loopで変化する音量±(def=0) ]]]]

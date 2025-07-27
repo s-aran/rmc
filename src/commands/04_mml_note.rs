@@ -1,6 +1,7 @@
 use crate::meta_models::{TokenStackTrait, TokenTrait};
 use crate::models::Part;
 use crate::part_command::{PartCommandParseState, WrappedPartCommand};
+use crate::utils::get_type_name;
 use crate::{
     errors::Pass2Error,
     models::{DivisorClock, NegativePositive, NegativePositiveEqual, NoteCommand},
@@ -308,11 +309,24 @@ impl PartCommandStruct for Octave {
     }
 
     fn is_match(command: &str) -> bool {
-        todo!()
+        vec!["o", "o+", "o-"].contains(&command)
     }
 
     fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
-        todo!()
+        match c {
+            '0'..='9' => {
+                working.eat(c);
+                working.jump(2);
+            }
+            _ => {
+                // other command
+                working.push();
+
+                return PartCommandParseState::Parsed;
+            }
+        };
+
+        PartCommandParseState::Parsing
     }
 }
 
@@ -426,6 +440,18 @@ impl TryFrom<PartTokenStack> for OctaveReverse {
     }
 }
 
+// ===============================================================================
+// §4-8	デフォルト音長指定
+// 	l
+// -------------------------------------------------------------------------------
+// [書式]	l[%]音長[.]
+// -------------------------------------------------------------------------------
+// [範囲]	1～255のうち、全音符長の約数となる値(->§2-11)または % をつけたclock値
+// -------------------------------------------------------------------------------
+// [音源]	FM / SSG / PCM / R選択 / R定義
+// -------------------------------------------------------------------------------
+// 	c d e f g a b r { } l= l+ l- l^ コマンドで、音長を省略した場合に
+// 	採用される音長を指定します。デフォルトは 4 です。
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DefaultLength {
     pub command: String,
@@ -443,11 +469,51 @@ impl PartCommandStruct for DefaultLength {
     }
 
     fn is_match(command: &str) -> bool {
-        todo!()
+        command == "l"
     }
 
     fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
-        todo!()
+        match c {
+            '%' => {
+                // clock, optional
+                if working.state != 1 {
+                    panic!("{}: unexpected {c}", get_type_name::<DefaultLength>());
+                }
+
+                working.eat(c);
+                working.jump(2);
+            }
+            '0'..='9' => {
+                // length, required
+                if working.state > 2 {
+                    panic!("{}: unexpected {c}", get_type_name::<DefaultLength>());
+                }
+
+                working.eat(c);
+                working.jump(3);
+            }
+            '.' => {
+                // dots, optional
+                if working.state > 4 {
+                    panic!("Note: unexpected {c}");
+                }
+
+                if working.state == 3 {
+                    working.push();
+                }
+
+                working.eat(c);
+                working.jump(4);
+            }
+            _ => {
+                // other command
+                working.push();
+
+                return PartCommandParseState::Parsed;
+            }
+        };
+
+        PartCommandParseState::Parsing
     }
 }
 
@@ -466,6 +532,7 @@ impl TryFrom<PartTokenStack> for DefaultLength {
         })
     }
 }
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ProcessLastLengthUpdate {
     pub command: String,
@@ -969,6 +1036,7 @@ impl PartCommandStruct for PartTranspose {
     }
 
     fn parse(working: &mut crate::meta_models::Pass2Working, c: char) -> PartCommandParseState {
+        println!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! c:{c}");
         match c {
             '+' | '-' | '=' => {
                 // semitone|natural, optional
@@ -998,7 +1066,7 @@ impl PartCommandStruct for PartTranspose {
                     panic!("Part Transpose: unexpecetd {c}");
                 }
 
-                // working.eat(c);
+                working.eat(c);
                 working.push();
             }
             _ => {
@@ -1018,6 +1086,8 @@ impl TryFrom<PartTokenStack> for PartTranspose {
     type Error = Pass2Error;
 
     fn try_from(mut value: PartTokenStack) -> Result<Self, Self::Error> {
+        println!("PartTranspose: {:?}", value);
+
         let command_begin = try_from_get_value!(value.pop_and_cast(1), command);
         let sign = try_from_get_some_value!(value.pop_and_cast::<NegativePositiveEqual>(2), sign);
         let notes = match value.part_command_stack_mut().pop_vec() {
